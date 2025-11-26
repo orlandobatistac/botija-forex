@@ -1,0 +1,68 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          timeout: 30m
+          command_timeout: 10m
+          debug: true
+          script: |
+            set -e
+            echo "🚀 Starting deployment..."
+            
+            # Setup SSH key for GitHub
+            mkdir -p ~/.ssh
+            chmod 700 ~/.ssh
+            echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/github_deploy
+            chmod 600 ~/.ssh/github_deploy
+            
+            # Add GitHub to known_hosts
+            ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null
+            
+            # Setup ssh-agent
+            eval "$(ssh-agent -s)"
+            ssh-add ~/.ssh/github_deploy
+            
+            # Deploy
+            cd /root/botija || exit 1
+            
+            # Ensure using SSH remote
+            git remote set-url origin git@github.com:orlandobatistac/botija.git
+            
+            echo "📦 Resetting local changes..."
+            git reset --hard origin/main
+            echo "📦 Pulling latest code..."
+            git pull origin main
+            
+            echo "📦 Installing dependencies..."
+            source venv_botija/bin/activate
+            cd backend
+            pip install -r requirements.txt --quiet
+            
+            echo "🔄 Restarting bot service..."
+            cd ..
+            systemctl restart botija
+            sleep 3
+            
+            echo "✅ Verifying service..."
+            if systemctl is-active --quiet botija; then
+              echo "✅ Deployment successful - botija service is running"
+            else
+              echo "❌ Deployment failed - botija service is not running"
+              systemctl status botija
+              exit 1
+            fi

@@ -1,0 +1,17 @@
+{
+    "project_name": "Kraken AI Trading Bot",
+    "codename": "kraken-ai-trading-bot",
+    "repository_url": "https://github.com/orlandobatistac/botija.git",
+    "domain": "",
+    "port": 8001,
+    "description": "Automated swing trading bot for Bitcoin using Kraken Spot API with AI validation, technical indicators, dynamic trailing stop-loss, and Telegram alerts",
+    "created_at": "2025-11-14",
+    "technology_stack": {
+        "backend": "FastAPI + Python 3.12+",
+        "frontend": "HTML + Alpine.js + TailwindCSS",
+        "database": "SQLite/PostgreSQL",
+        "deployment": "VPS + Nginx + systemd",
+        "trading": "Kraken Spot API + OpenAI SDK"
+    },
+    "version": "1.0.0"
+}

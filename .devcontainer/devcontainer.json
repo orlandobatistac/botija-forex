@@ -1,0 +1,43 @@
+{
+    "name": "Kraken AI Trading Bot DevContainer",
+    "image": "mcr.microsoft.com/devcontainers/python:3.12",
+    "features": {
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "18"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.black-formatter",
+                "ms-python.pylint",
+                "ms-toolsai.jupyter",
+                "GitHub.copilot",
+                "GitHub.copilot-chat",
+                "ms-python.debugpy"
+            ],
+            "settings": {
+                "python.linting.enabled": true,
+                "python.linting.pylintEnabled": true,
+                "python.formatting.provider": "black",
+                "python.testing.pytestEnabled": true,
+                "[python]": {
+                    "editor.formatOnSave": true,
+                    "editor.defaultFormatter": "ms-python.black-formatter"
+                }
+            }
+        }
+    },
+    "postCreateCommand": "pip install -r backend/requirements.txt && echo '✅ Dependencies installed'",
+    "forwardPorts": [
+        8001
+    ],
+    "portsAttributes": {
+        "8001": {
+            "label": "Kraken AI Trading Bot API",
+            "onAutoForward": "notify"
+        }
+    }
+}
