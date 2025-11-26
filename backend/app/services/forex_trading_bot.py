@@ -11,6 +11,8 @@ from .oanda_client import OandaClient
 from .technical_indicators import TechnicalIndicators
 from .ai_validator import AISignalValidator
 from .telegram_alerts import TelegramAlerts
+from .forex_trailing_stop import ForexTrailingStop
+from .multi_timeframe import MultiTimeframeAnalyzer
 from ..config import Config
 
 logger = logging.getLogger(__name__)
@@ -34,16 +36,43 @@ class ForexTradingBot:
         min_balance_percent: float = 20,
         stop_loss_pips: float = 50,
         take_profit_pips: float = 100,
-        trailing_stop_pips: float = 30
+        trailing_stop_enabled: bool = True,
+        trailing_stop_distance_pips: float = 30,
+        trailing_stop_activation_pips: float = 20
     ):
         """Initialize Forex trading bot"""
+
+        # Logger first
+        self.logger = logger
+        self.is_running = False
 
         # OANDA client
         self.oanda = OandaClient(oanda_api_key, oanda_account_id, oanda_environment) if oanda_api_key else None
 
-        # AI and notifications
-        self.ai = AISignalValidator(openai_api_key) if openai_api_key else None
+        # AI and notifications (always create AI validator to show warning if not configured)
+        self.ai = AISignalValidator(openai_api_key)
         self.telegram = TelegramAlerts(telegram_token, telegram_chat_id) if telegram_token else None
+
+        # Trailing Stop
+        self.trailing_stop_enabled = trailing_stop_enabled
+        self.trailing_stop = None
+        if trailing_stop_enabled and self.oanda:
+            self.trailing_stop = ForexTrailingStop(
+                oanda_client=self.oanda,
+                trailing_distance_pips=trailing_stop_distance_pips,
+                activation_pips=trailing_stop_activation_pips
+            )
+            self.logger.info(f"📍 Trailing stop enabled: {trailing_stop_distance_pips} pips (activates at +{trailing_stop_activation_pips} pips)")
+
+        # Risk Manager
+        self.risk_manager = None
+
+        # Multi-timeframe Analyzer
+        self.multi_tf_enabled = Config.MULTI_TIMEFRAME_ENABLED if hasattr(Config, 'MULTI_TIMEFRAME_ENABLED') else True
+        self.multi_tf = None
+        if self.multi_tf_enabled and self.oanda:
+            self.multi_tf = MultiTimeframeAnalyzer(self.oanda, instrument)
+            self.logger.info("📊 Multi-timeframe analysis enabled (H1+H4)")
 
         # Trading parameters
         self.instrument = instrument
@@ -53,13 +82,14 @@ class ForexTradingBot:
         self.min_balance_percent = min_balance_percent
         self.stop_loss_pips = stop_loss_pips
         self.take_profit_pips = take_profit_pips
-        self.trailing_stop_pips = trailing_stop_pips
-
-        self.is_running = False
-        self.logger = logger
 
         env_display = oanda_environment.upper() if oanda_api_key else "DEMO"
         self.logger.info(f"ForexTradingBot initialized: {instrument} ({env_display})")
+
+    def set_risk_manager(self, risk_manager):
+        """Set external risk manager"""
+        self.risk_manager = risk_manager
+        self.logger.info("🛡️ Risk Manager attached")
 
     def _calculate_trade_amount(self, balance: float) -> float:
         """Calculate trade amount based on config"""
@@ -133,7 +163,18 @@ class ForexTradingBot:
                     balance=balance
                 )
             else:
-                ai_signal = {'signal': 'HOLD', 'confidence': 0.5, 'reason': 'No AI configured'}
+                ai_signal = {'signal': 'HOLD', 'confidence': 0.0, 'reason': '⚠️ AI not initialized'}
+
+            # Multi-timeframe confirmation
+            mtf_signal = None
+            mtf_confirmed = True  # Default to True if MTF disabled
+
+            if self.multi_tf and self.multi_tf_enabled:
+                mtf_signal = self.multi_tf.get_confirmed_signal()
+                mtf_confirmed = mtf_signal.get('confirmation', False)
+
+                if not mtf_confirmed:
+                    self.logger.info(f"⏳ Multi-TF not confirmed: {mtf_signal.get('reason', 'waiting')}")
 
             # Calculate trade parameters
             trade_amount = self._calculate_trade_amount(balance)
@@ -156,12 +197,16 @@ class ForexTradingBot:
                 'has_position': has_position,
                 'tech_signals': tech_signals,
                 'ai_signal': ai_signal,
+                'mtf_signal': mtf_signal,
+                'mtf_confirmed': mtf_confirmed,
                 'trade_amount_usd': trade_amount,
                 'units_to_trade': units_to_trade,
                 'min_balance_required': min_balance_required,
                 'available_to_trade': available_to_trade,
                 'should_buy': (
                     ai_signal['signal'] == 'BUY' and
+                    ai_signal.get('confidence', 0) >= 0.6 and
+                    mtf_confirmed and  # Multi-timeframe confirmation
                     available_to_trade >= trade_amount and
                     not has_position
                 ),
@@ -172,7 +217,15 @@ class ForexTradingBot:
                 ),
                 'should_short': (
                     ai_signal['signal'] == 'SELL' and
+                    ai_signal.get('confidence', 0) >= 0.6 and
+                    mtf_confirmed and  # Multi-timeframe confirmation
+                    available_to_trade >= trade_amount and
                     not has_position
+                ),
+                'should_cover': (
+                    ai_signal['signal'] == 'BUY' and
+                    has_position and
+                    position_units < 0  # Short position to close
                 )
             }
 
@@ -223,6 +276,14 @@ class ForexTradingBot:
             if result['success']:
                 self.logger.info(f"BUY executed: {result}")
 
+                # Start trailing stop
+                if self.trailing_stop:
+                    self.trailing_stop.start_trailing(
+                        instrument=self.instrument,
+                        direction='LONG',
+                        entry_price=result.get('price', analysis['current_price'])
+                    )
+
                 if self.telegram:
                     self.telegram.send_forex_buy_signal(
                         instrument=self.instrument,
@@ -253,6 +314,10 @@ class ForexTradingBot:
             if result['success']:
                 self.logger.info(f"SELL executed: {result}")
 
+                # Stop trailing stop
+                if self.trailing_stop:
+                    self.trailing_stop.stop_trailing(self.instrument)
+
                 if self.telegram:
                     self.telegram.send_forex_sell_signal(
                         instrument=self.instrument,
@@ -270,6 +335,53 @@ class ForexTradingBot:
 
         except Exception as e:
             self.logger.error(f"Error executing sell: {e}")
+            return {'success': False, 'error': str(e)}
+
+    async def execute_short(self, analysis: Dict) -> Dict:
+        """Execute a short (sell) order - open short position"""
+        try:
+            units = analysis.get('units_to_trade', 0)
+            if units <= 0:
+                return {'success': False, 'error': 'Invalid units'}
+
+            self.logger.info(f"Executing SHORT: {units} units {self.instrument}")
+
+            result = self.oanda.place_market_order(
+                instrument=self.instrument,
+                units=-units,  # Negative = sell/short
+                stop_loss_pips=self.stop_loss_pips if self.stop_loss_pips > 0 else None,
+                take_profit_pips=self.take_profit_pips if self.take_profit_pips > 0 else None
+            )
+
+            if result['success']:
+                self.logger.info(f"SHORT executed: {result}")
+
+                # Start trailing stop for SHORT
+                if self.trailing_stop:
+                    self.trailing_stop.start_trailing(
+                        instrument=self.instrument,
+                        direction='SHORT',
+                        entry_price=result.get('price', analysis['current_price'])
+                    )
+
+                if self.telegram:
+                    self.telegram.send_forex_short_signal(
+                        instrument=self.instrument,
+                        price=result.get('price', analysis['current_price']),
+                        units=units,
+                        stop_loss_pips=self.stop_loss_pips,
+                        take_profit_pips=self.take_profit_pips,
+                        confidence=analysis['ai_signal']['confidence']
+                    )
+            else:
+                self.logger.error(f"SHORT failed: {result.get('error')}")
+                if self.telegram:
+                    self.telegram.send_error_alert(f"Short failed: {result.get('error')}")
+
+            return result
+
+        except Exception as e:
+            self.logger.error(f"Error executing short: {e}")
             return {'success': False, 'error': str(e)}
 
     async def run_cycle(self, trigger: str = "scheduled") -> Dict:
@@ -328,19 +440,77 @@ class ForexTradingBot:
             self.logger.info(f"📈 EMA{Config.EMA_FAST_PERIOD}: {tech.get('ema20', 0):.5f} | EMA{Config.EMA_SLOW_PERIOD}: {tech.get('ema50', 0):.5f} | RSI: {tech.get('rsi14', 0):.1f}")
             self.logger.info(f"🤖 AI Signal: {ai_sig.get('signal', 'N/A')} (confidence: {ai_sig.get('confidence', 0):.0%})")
 
+            # Update trailing stop if position exists
+            trailing_result = None
+            if self.trailing_stop and analysis.get('has_position'):
+                trailing_result = self.trailing_stop.update(
+                    self.instrument,
+                    analysis.get('current_price', 0)
+                )
+                if trailing_result.get('activated'):
+                    self.logger.info(f"📍 Trailing: +{trailing_result.get('profit_pips', 0):.1f} pips | Stop: {trailing_result.get('new_stop', 0):.5f}")
+
+                # Check if trailing stop was hit
+                if trailing_result.get('should_close'):
+                    self.logger.warning("🛑 TRAILING STOP HIT - closing position")
+                    result = await self.execute_sell(analysis)
+                    cycle_data['action'] = 'TRAILING_STOP' if result.get('success') else 'TRAILING_FAILED'
+                    cycle_data['trade_id'] = result.get('order_id')
+                    cycle_data['profit_loss'] = result.get('pl')
+
+                    # Record trade in risk manager
+                    if self.risk_manager and result.get('pl'):
+                        self.risk_manager.record_trade(result.get('pl'))
+
+                    execution_time = int((time.time() - start_time) * 1000)
+                    self._save_cycle(cycle_data, execution_time, trigger)
+                    return {'success': True, 'analysis': analysis, 'action': cycle_data['action']}
+
+            # Check risk manager before trading
+            risk_status = None
+            if self.risk_manager:
+                risk_status = self.risk_manager.update_balance(analysis.get('balance', 0))
+                if not risk_status['can_trade']:
+                    self.logger.warning(f"🛡️ Risk Manager: Trading blocked - {risk_status.get('warnings', [])}")
+                    cycle_data['action'] = 'RISK_BLOCKED'
+                    execution_time = int((time.time() - start_time) * 1000)
+                    self._save_cycle(cycle_data, execution_time, trigger)
+                    return {'success': True, 'analysis': analysis, 'action': 'RISK_BLOCKED', 'reason': risk_status.get('warnings')}
+
             # Execute based on signals
             if analysis.get('should_buy'):
-                self.logger.info("✅ BUY signal detected - executing")
+                self.logger.info("✅ BUY signal detected - opening LONG")
                 result = await self.execute_buy(analysis)
                 cycle_data['action'] = 'BOUGHT' if result.get('success') else 'BUY_FAILED'
                 cycle_data['trade_id'] = result.get('order_id')
 
             elif analysis.get('should_sell'):
-                self.logger.info("✅ SELL signal detected - closing position")
+                self.logger.info("✅ SELL signal detected - closing LONG position")
                 result = await self.execute_sell(analysis)
                 cycle_data['action'] = 'SOLD' if result.get('success') else 'SELL_FAILED'
                 cycle_data['trade_id'] = result.get('order_id')
                 cycle_data['profit_loss'] = result.get('pl')
+
+                # Record trade in risk manager
+                if self.risk_manager and result.get('success') and result.get('pl') is not None:
+                    self.risk_manager.record_trade(result.get('pl'))
+
+            elif analysis.get('should_short'):
+                self.logger.info("✅ SHORT signal detected - opening SHORT")
+                result = await self.execute_short(analysis)
+                cycle_data['action'] = 'SHORTED' if result.get('success') else 'SHORT_FAILED'
+                cycle_data['trade_id'] = result.get('order_id')
+
+            elif analysis.get('should_cover'):
+                self.logger.info("✅ COVER signal detected - closing SHORT position")
+                result = await self.execute_sell(analysis)  # Close position works for both
+                cycle_data['action'] = 'COVERED' if result.get('success') else 'COVER_FAILED'
+                cycle_data['trade_id'] = result.get('order_id')
+                cycle_data['profit_loss'] = result.get('pl')
+
+                # Record trade in risk manager
+                if self.risk_manager and result.get('success') and result.get('pl') is not None:
+                    self.risk_manager.record_trade(result.get('pl'))
 
             else:
                 self.logger.info("⏸️ No trading signal - HOLD")

@@ -583,3 +583,7 @@ class OandaClient:
         if "JPY" in instrument:
             return price_diff / 0.01
         return price_diff / 0.0001
+
+    def modify_trade_stop_loss(self, trade_id: str, stop_loss: float) -> Dict:
+        """Convenience method to modify only stop loss"""
+        return self.modify_trade_sl_tp(trade_id, stop_loss=stop_loss)

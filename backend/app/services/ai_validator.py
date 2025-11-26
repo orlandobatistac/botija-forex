@@ -4,7 +4,7 @@ OpenAI AI signal validation for Forex Trading
 
 from openai import OpenAI
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -12,10 +12,25 @@ logger = logging.getLogger(__name__)
 class AISignalValidator:
     """AI-based signal validation using OpenAI for Forex"""
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: Optional[str] = None):
         """Initialize OpenAI client"""
-        self.client = OpenAI(api_key=api_key)
+        self.api_key = api_key
+        self.client = None
         self.logger = logger
+
+        if api_key and api_key.strip():
+            try:
+                self.client = OpenAI(api_key=api_key)
+                self.logger.info("✅ AI Validator initialized with OpenAI")
+            except Exception as e:
+                self.logger.error(f"❌ Failed to initialize OpenAI: {e}")
+        else:
+            self.logger.warning("⚠️ AI Validator: No OPENAI_API_KEY configured - AI signals disabled")
+
+    @property
+    def is_configured(self) -> bool:
+        """Check if AI is properly configured"""
+        return self.client is not None
 
     def get_signal(
         self,
@@ -29,6 +44,17 @@ class AISignalValidator:
         balance: float
     ) -> Dict:
         """Get AI signal for Forex trading decision"""
+
+        # Check if AI is configured
+        if not self.is_configured:
+            return {
+                'signal': 'HOLD',
+                'confidence': 0.0,
+                'reason': '⚠️ OPENAI_API_KEY not configured - AI disabled',
+                'raw_response': '',
+                'ai_enabled': False
+            }
+
         try:
             # Calculate context
             ema_trend = "ALCISTA" if ema_fast > ema_slow else "BAJISTA"
@@ -123,7 +149,8 @@ REASON: [Explicación técnica breve]
                 'signal': signal,
                 'confidence': confidence,
                 'reason': reason,
-                'raw_response': content
+                'raw_response': content,
+                'ai_enabled': True
             }
 
         except Exception as e:
@@ -132,5 +159,6 @@ REASON: [Explicación técnica breve]
                 'signal': 'HOLD',
                 'confidence': 0.0,
                 'reason': f'Error: {str(e)}',
-                'raw_response': ''
+                'raw_response': '',
+                'ai_enabled': True
             }

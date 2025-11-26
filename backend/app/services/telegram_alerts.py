@@ -91,6 +91,29 @@ class TelegramAlerts:
 """
         return self.send_message(message)
 
+    def send_forex_short_signal(
+        self,
+        instrument: str,
+        price: float,
+        units: int,
+        stop_loss_pips: float,
+        take_profit_pips: float,
+        confidence: float
+    ) -> bool:
+        """Send short signal notification"""
+        message = f"""
+🔴 <b>SHORT {instrument}</b> 🔴
+
+📍 Entry Price: <code>{price:.5f}</code>
+📊 Units: <code>{units:,}</code>
+🛑 Stop Loss: <code>{stop_loss_pips:.1f}</code> pips
+🎯 Take Profit: <code>{take_profit_pips:.1f}</code> pips
+🤖 AI Confidence: <code>{confidence:.0%}</code>
+
+<i>Bearish position opened on OANDA</i>
+"""
+        return self.send_message(message)
+
     def send_cycle_summary(
         self,
         instrument: str,

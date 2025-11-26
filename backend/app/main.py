@@ -65,11 +65,12 @@ if os.path.exists(frontend_static):
     app.mount("/static", StaticFiles(directory=frontend_static), name="static")
 
 # Import and include routers
-from .routers import bot, trades, cycles
+from .routers import bot, trades, cycles, market
 
 app.include_router(bot.router)
 app.include_router(trades.router)
 app.include_router(cycles.router)
+app.include_router(market.router)
 
 
 @app.get("/")

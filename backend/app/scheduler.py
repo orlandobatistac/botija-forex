@@ -10,12 +10,14 @@ from datetime import datetime
 
 from .config import Config
 from .services.forex_trading_bot import ForexTradingBot
+from .services.risk_manager import RiskManager
 
 logger = logging.getLogger(__name__)
 
 # Global instances
 scheduler = BackgroundScheduler()
 trading_bot: ForexTradingBot = None
+risk_manager: RiskManager = None
 
 # Track last cycle execution
 last_cycle_info = {
@@ -24,6 +26,22 @@ last_cycle_info = {
     "error": None,
     "trigger": None
 }
+
+
+def get_risk_manager() -> RiskManager:
+    """Get or create risk manager instance"""
+    global risk_manager
+
+    if risk_manager is None and Config.RISK_MANAGER_ENABLED:
+        risk_manager = RiskManager(
+            max_daily_loss_percent=Config.MAX_DAILY_LOSS_PERCENT,
+            max_drawdown_percent=Config.MAX_DRAWDOWN_PERCENT,
+            max_consecutive_losses=Config.MAX_CONSECUTIVE_LOSSES,
+            base_risk_per_trade_percent=Config.RISK_PER_TRADE_PERCENT
+        )
+        logger.info(f"🛡️ Risk Manager initialized: max daily loss {Config.MAX_DAILY_LOSS_PERCENT}%, max DD {Config.MAX_DRAWDOWN_PERCENT}%")
+
+    return risk_manager
 
 
 def get_trading_bot() -> ForexTradingBot:
@@ -43,8 +61,16 @@ def get_trading_bot() -> ForexTradingBot:
             min_balance_percent=Config.MIN_BALANCE_PERCENT,
             stop_loss_pips=Config.STOP_LOSS_PIPS,
             take_profit_pips=Config.TAKE_PROFIT_PIPS,
-            trailing_stop_pips=Config.TRAILING_STOP_PIPS
+            trailing_stop_enabled=Config.TRAILING_STOP_ENABLED,
+            trailing_stop_distance_pips=Config.TRAILING_STOP_DISTANCE_PIPS,
+            trailing_stop_activation_pips=Config.TRAILING_STOP_ACTIVATION_PIPS
         )
+
+        # Attach risk manager
+        rm = get_risk_manager()
+        if rm:
+            trading_bot.set_risk_manager(rm)
+
         logger.info(f"✅ Trading bot initialized: {Config.DEFAULT_INSTRUMENT} ({Config.TRADING_MODE})")
 
     return trading_bot
