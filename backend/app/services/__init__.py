@@ -11,6 +11,10 @@ from .multi_timeframe import MultiTimeframeAnalyzer
 from .multi_pair import MultiPairManager
 from .backtester import Backtester
 from .log_handler import get_log_handler, setup_log_handler
+from .sentiment_analyzer import SentimentAnalyzer
+from .economic_calendar import EconomicCalendar
+from .news_sentiment import NewsSentimentAnalyzer
+from .enhanced_ai_validator import EnhancedAIValidator, MarketContext
 
 __all__ = [
     "OandaClient",
@@ -25,4 +29,9 @@ __all__ = [
     "Backtester",
     "get_log_handler",
     "setup_log_handler",
+    "SentimentAnalyzer",
+    "EconomicCalendar",
+    "NewsSentimentAnalyzer",
+    "EnhancedAIValidator",
+    "MarketContext",
 ]
