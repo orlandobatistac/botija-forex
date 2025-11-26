@@ -2,6 +2,6 @@
 Trading mode configuration
 """
 
-# PAPER: Simulated trading with real market data
-# REAL: Actual trades on Kraken Spot API
-MODE = "PAPER"
+# DEMO: Simulated trading with real market data (OANDA Demo Account)
+# LIVE: Actual trades on OANDA Live Account
+MODE = "DEMO"

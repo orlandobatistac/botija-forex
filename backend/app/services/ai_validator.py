@@ -1,5 +1,5 @@
 """
-OpenAI AI signal validation
+OpenAI AI signal validation for Forex Trading
 """
 
 from openai import OpenAI
@@ -8,94 +8,105 @@ from typing import Dict
 
 logger = logging.getLogger(__name__)
 
+
 class AISignalValidator:
-    """AI-based signal validation using OpenAI"""
-    
+    """AI-based signal validation using OpenAI for Forex"""
+
     def __init__(self, api_key: str):
         """Initialize OpenAI client"""
         self.client = OpenAI(api_key=api_key)
         self.logger = logger
-    
+
     def get_signal(
         self,
+        instrument: str,
         price: float,
-        ema20: float,
-        ema50: float,
+        ema_fast: float,
+        ema_slow: float,
         rsi: float,
-        btc_balance: float,
-        usd_balance: float
+        spread_pips: float,
+        position_units: int,
+        balance: float
     ) -> Dict:
-        """Get AI signal for trading decision"""
+        """Get AI signal for Forex trading decision"""
         try:
-            # Calculate additional context
-            ema_trend = "ALCISTA" if ema20 > ema50 else "BAJISTA"
-            # Avoid division by zero
-            ema_gap = abs(ema20 - ema50) / ema50 * 100 if ema50 > 0 else 0
-            
+            # Calculate context
+            ema_trend = "ALCISTA" if ema_fast > ema_slow else "BAJISTA"
+            ema_gap_pips = abs(ema_fast - ema_slow) * 10000  # Convert to pips for majors
+            has_position = position_units != 0
+            position_type = "LONG" if position_units > 0 else "SHORT" if position_units < 0 else "FLAT"
+
             prompt = f"""
-Eres un trader experto en Bitcoin swing trading. Tu objetivo es generar ganancias consistentes operando cada 1-24 horas.
+Eres un trader experto en Forex. Tu objetivo es generar ganancias consistentes operando {instrument}.
 
 DATOS ACTUALES:
-- Precio BTC: ${price:,.2f}
-- EMA20: ${ema20:,.2f}
-- EMA50: ${ema50:,.2f}
-- Gap EMA: {ema_gap:.2f}%
+- Par: {instrument}
+- Precio: {price:.5f}
+- EMA20: {ema_fast:.5f}
+- EMA50: {ema_slow:.5f}
+- Gap EMA: {ema_gap_pips:.1f} pips
 - Tendencia: {ema_trend}
-- RSI14: {rsi:.2f}
-- Balance BTC: {btc_balance:.8f}
-- Balance USD: ${usd_balance:,.2f}
+- RSI14: {rsi:.1f}
+- Spread: {spread_pips:.1f} pips
+- Posición: {position_type} ({abs(position_units)} units)
+- Balance: ${balance:,.2f}
 
-ESTRATEGIA SWING TRADING:
-Objetivo: Capturar movimientos del 2-8% cada operación, acumulando ganancias mensuales del 15-30%.
+ESTRATEGIA FOREX SWING:
+Objetivo: Capturar movimientos de 30-100 pips por operación.
 
-SEÑAL BUY (comprar para swing):
-- Tendencia ALCISTA (EMA20 > EMA50) con momentum
+SEÑAL BUY (abrir/mantener largo):
+- Tendencia ALCISTA (EMA20 > EMA50)
 - RSI entre 40-65 (no sobrecomprado)
-- Confirmación de rebote o inicio de tendencia alcista
-- Evitar comprar en máximos históricos recientes
+- Spread razonable (< 3 pips para majors)
+- Sin posición corta abierta
 
-SEÑAL SELL (tomar ganancias):
-- Indicios de reversión de tendencia
-- RSI > 70 (sobrecomprado) o señales de debilidad
-- Trailing stop manejará ventas automáticas por caída
+SEÑAL SELL (abrir/mantener corto o cerrar largo):
+- Tendencia BAJISTA (EMA20 < EMA50)
+- RSI entre 35-60 (no sobrevendido)
+- Spread razonable
+- O cerrar posición larga existente
 
 SEÑAL HOLD:
-- Condiciones no claras o mercado lateral
-- Mejor esperar oportunidad con mayor probabilidad
+- Mercado lateral o indeciso
+- Spread muy alto
+- RSI en extremos sin confirmación
 
-INSTRUCCIONES:
-Analiza los datos con criterio de trader profesional. Prioriza:
-1. Protección de capital (no entrar en caídas)
-2. Timing óptimo (esperar confirmaciones)
-3. Gestión de riesgo (solo trades con buena relación riesgo/recompensa)
+REGLAS:
+1. Protección de capital primero
+2. No operar contra la tendencia principal
+3. Evitar spreads altos (noticias, baja liquidez)
+4. Respetar gestión de riesgo
 
-Responde en formato:
+Responde EXACTAMENTE en este formato:
 SIGNAL: BUY/SELL/HOLD
 CONFIDENCE: [0.0-1.0]
-REASON: [Explicación técnica breve del por qué]
+REASON: [Explicación técnica breve]
 """
-            
+
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini",  # Mejor análisis que gpt-3.5-turbo
+                model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "Eres un trader profesional especializado en Bitcoin swing trading. Generas señales precisas y rentables basadas en análisis técnico."},
+                    {
+                        "role": "system",
+                        "content": "Eres un trader profesional de Forex. Generas señales precisas basadas en análisis técnico."
+                    },
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.5,  # Balance entre consistencia y adaptabilidad
+                temperature=0.3,
                 max_tokens=150
             )
-            
+
             content = response.choices[0].message.content.strip()
-            
+
             # Parse response
             signal = 'HOLD'
             confidence = 0.5
             reason = ''
-            
+
             lines = content.split('\n')
             for line in lines:
                 if line.startswith('SIGNAL:'):
-                    signal_text = line.replace('SIGNAL:', '').strip()
+                    signal_text = line.replace('SIGNAL:', '').strip().upper()
                     signal = signal_text if signal_text in ['BUY', 'SELL', 'HOLD'] else 'HOLD'
                 elif line.startswith('CONFIDENCE:'):
                     try:
@@ -105,16 +116,16 @@ REASON: [Explicación técnica breve del por qué]
                         confidence = 0.5
                 elif line.startswith('REASON:'):
                     reason = line.replace('REASON:', '').strip()
-            
-            self.logger.info(f"AI Signal: {signal} (confidence: {confidence})")
-            
+
+            self.logger.info(f"AI Signal: {signal} (confidence: {confidence:.0%})")
+
             return {
                 'signal': signal,
                 'confidence': confidence,
                 'reason': reason,
                 'raw_response': content
             }
-        
+
         except Exception as e:
             self.logger.error(f"Error getting AI signal: {e}")
             return {

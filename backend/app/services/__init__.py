@@ -1,17 +1,18 @@
-"""Services package for trading bot"""
+"""Services package for Botija Forex"""
 
-from .kraken_client import KrakenClient
+from .oanda_client import OandaClient
 from .technical_indicators import TechnicalIndicators
 from .ai_validator import AISignalValidator
 from .telegram_alerts import TelegramAlerts
 from .trailing_stop import TrailingStop
-from .trading_bot import TradingBot
+from .log_handler import get_log_handler, setup_log_handler
 
 __all__ = [
-    'KrakenClient',
-    'TechnicalIndicators',
-    'AISignalValidator',
-    'TelegramAlerts',
-    'TrailingStop',
-    'TradingBot'
+    "OandaClient",
+    "TechnicalIndicators",
+    "AISignalValidator",
+    "TelegramAlerts",
+    "TrailingStop",
+    "get_log_handler",
+    "setup_log_handler",
 ]

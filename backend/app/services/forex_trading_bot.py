@@ -58,7 +58,7 @@ class ForexTradingBot:
         self.is_running = False
         self.logger = logger
 
-        env_display = oanda_environment.upper() if oanda_api_key else "PAPER"
+        env_display = oanda_environment.upper() if oanda_api_key else "DEMO"
         self.logger.info(f"ForexTradingBot initialized: {instrument} ({env_display})")
 
     def _calculate_trade_amount(self, balance: float) -> float:
@@ -122,7 +122,7 @@ class ForexTradingBot:
 
             # Get AI signal
             if self.ai:
-                ai_signal = self.ai.get_forex_signal(
+                ai_signal = self.ai.get_signal(
                     instrument=self.instrument,
                     price=current_price,
                     ema_fast=tech_signals.get('ema20', 0),
@@ -371,17 +371,19 @@ class ForexTradingBot:
 
             db = SessionLocal()
             cycle = TradingCycle(
-                btc_price=cycle_data['price'],  # Reusing field for forex price
-                ema20=cycle_data['ema_fast'],
-                ema50=cycle_data['ema_slow'],
-                rsi14=cycle_data['rsi'],
-                btc_balance=cycle_data['position_units'],  # Reusing for position
-                usd_balance=cycle_data['balance'],
+                instrument=cycle_data['instrument'],
+                price=cycle_data['price'],
+                ema_fast=cycle_data['ema_fast'],
+                ema_slow=cycle_data['ema_slow'],
+                rsi=cycle_data['rsi'],
+                balance=cycle_data['balance'],
+                position_units=cycle_data['position_units'],
                 ai_signal=cycle_data['ai_signal'],
                 ai_confidence=cycle_data['ai_confidence'],
                 ai_reason=cycle_data['ai_reason'],
                 action=cycle_data['action'],
                 trade_id=cycle_data['trade_id'],
+                profit_loss=cycle_data['profit_loss'],
                 execution_time_ms=execution_time_ms,
                 trading_mode=cycle_data['trading_mode'],
                 trigger=trigger,

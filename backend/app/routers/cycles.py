@@ -1,42 +1,86 @@
 """
-Trading Cycles router - track execution cycles
+Trading Cycles router - Cycle history and analysis
 """
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
-from .. import models, schemas
+
 from ..database import get_db
+from .. import models, schemas
 
 router = APIRouter(
     prefix="/api/v1/cycles",
     tags=["cycles"]
 )
 
-@router.get("/", response_model=List[schemas.TradingCycle])
+
+@router.get("/", response_model=List[schemas.TradingCycleResponse])
 async def get_trading_cycles(
     limit: int = 20,
+    instrument: str = None,
     db: Session = Depends(get_db)
 ):
     """Get recent trading cycles"""
     try:
-        cycles = db.query(models.TradingCycle)\
-            .order_by(models.TradingCycle.executed_at.desc())\
-            .limit(limit)\
-            .all()
+        query = db.query(models.TradingCycle).order_by(models.TradingCycle.timestamp.desc())
+
+        if instrument:
+            query = query.filter(models.TradingCycle.instrument == instrument)
+
+        cycles = query.limit(limit).all()
         return cycles
-    except Exception as e:
-        # Return empty list if table doesn't exist or error
+    except Exception:
         return []
 
-@router.post("/", response_model=schemas.TradingCycle)
-async def create_trading_cycle(
-    cycle: schemas.TradingCycleCreate,
+
+@router.get("/last")
+async def get_last_cycle(db: Session = Depends(get_db)):
+    """Get the most recent trading cycle"""
+    try:
+        cycle = db.query(models.TradingCycle).order_by(
+            models.TradingCycle.timestamp.desc()
+        ).first()
+
+        if not cycle:
+            return {"message": "No cycles recorded yet"}
+
+        return cycle
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@router.get("/stats")
+async def get_cycle_stats(
+    instrument: str = None,
     db: Session = Depends(get_db)
 ):
-    """Create a new trading cycle record"""
-    db_cycle = models.TradingCycle(**cycle.dict())
-    db.add(db_cycle)
-    db.commit()
-    db.refresh(db_cycle)
-    return db_cycle
+    """Get cycle statistics"""
+    try:
+        query = db.query(models.TradingCycle)
+
+        if instrument:
+            query = query.filter(models.TradingCycle.instrument == instrument)
+
+        cycles = query.all()
+
+        if not cycles:
+            return {
+                "total_cycles": 0,
+                "buy_signals": 0,
+                "sell_signals": 0,
+                "hold_signals": 0,
+                "actions_taken": 0,
+                "errors": 0
+            }
+
+        return {
+            "total_cycles": len(cycles),
+            "buy_signals": len([c for c in cycles if c.ai_signal == "BUY"]),
+            "sell_signals": len([c for c in cycles if c.ai_signal == "SELL"]),
+            "hold_signals": len([c for c in cycles if c.ai_signal == "HOLD"]),
+            "actions_taken": len([c for c in cycles if c.action in ["BOUGHT", "SOLD"]]),
+            "errors": len([c for c in cycles if c.action == "ERROR"])
+        }
+    except Exception as e:
+        return {"error": str(e)}
