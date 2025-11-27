@@ -123,6 +123,70 @@ async def stop_bot():
         return {"message": str(e), "status": "error"}
 
 
+@router.get("/position")
+async def get_active_position():
+    """Get active position details from OANDA"""
+    try:
+        bot = get_trading_bot()
+        if not bot or not bot.oanda:
+            return {"has_position": False, "position": None}
+
+        instrument = Config.DEFAULT_INSTRUMENT
+        position = bot.oanda.get_position(instrument)
+
+        if not position:
+            return {"has_position": False, "position": None}
+
+        long_units = int(position.get("long", {}).get("units", 0))
+        short_units = int(position.get("short", {}).get("units", 0))
+        total_units = long_units + short_units
+
+        if total_units == 0:
+            return {"has_position": False, "position": None}
+
+        # Get current price for P/L calculation
+        pricing = bot.oanda.get_spread(instrument)
+        current_price = pricing.get("mid", 0) if pricing else 0
+
+        # Determine side and get details
+        if long_units > 0:
+            side = "LONG"
+            units = long_units
+            avg_price = float(position.get("long", {}).get("averagePrice", 0))
+            unrealized_pl = float(position.get("long", {}).get("unrealizedPL", 0))
+        else:
+            side = "SHORT"
+            units = abs(short_units)
+            avg_price = float(position.get("short", {}).get("averagePrice", 0))
+            unrealized_pl = float(position.get("short", {}).get("unrealizedPL", 0))
+
+        # Calculate P/L in pips
+        if avg_price > 0 and current_price > 0:
+            pip_multiplier = 10000 if "JPY" not in instrument else 100
+            if side == "LONG":
+                pl_pips = (current_price - avg_price) * pip_multiplier
+            else:
+                pl_pips = (avg_price - current_price) * pip_multiplier
+        else:
+            pl_pips = 0
+
+        return {
+            "has_position": True,
+            "position": {
+                "instrument": instrument,
+                "side": side,
+                "units": units,
+                "entry_price": avg_price,
+                "current_price": current_price,
+                "unrealized_pl": unrealized_pl,
+                "pl_pips": round(pl_pips, 1)
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting position: {e}")
+        return {"has_position": False, "position": None, "error": str(e)}
+
+
 @router.post("/cycle")
 async def run_cycle():
     """Execute one trading cycle manually"""
