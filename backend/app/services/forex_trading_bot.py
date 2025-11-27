@@ -110,10 +110,10 @@ class ForexTradingBot:
     def _calculate_trade_amount(self, balance: float) -> float:
         """
         Calculate trade amount (notional) based on config.
-        
+
         TRADE_AMOUNT_PERCENT = % of balance to use as MARGIN
         Then multiply by leverage to get notional.
-        
+
         Example: $100k balance, 10% trade amount, 50:1 leverage
                  Margin = $10,000 → Notional = $10,000 * 50 = $500,000
         """
@@ -121,11 +121,11 @@ class ForexTradingBot:
             return self.trade_amount_usd
 
         leverage = getattr(Config, 'ACCOUNT_LEVERAGE', 50)
-        
+
         # trade_amount_percent is the % of balance to use as margin
         margin = balance * (self.trade_amount_percent / 100)
         notional = margin * leverage
-        
+
         self.logger.debug(f"Position sizing: {self.trade_amount_percent}% margin (${margin:.0f}) × {leverage}:1 = ${notional:.0f} notional")
         return notional
 
