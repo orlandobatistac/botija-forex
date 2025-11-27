@@ -48,7 +48,9 @@ class BacktestResult:
     total_trades: int
     winning_trades: int
     losing_trades: int
-    total_pips: float
+    gross_pips: float  # Before spread
+    total_pips: float  # After spread (net)
+    spread_cost_pips: float  # Total spread paid
     max_drawdown_pips: float
     win_rate: float
     profit_factor: float
@@ -91,6 +93,9 @@ class Backtester:
 
         # Pip value for calculations
         self.pip_value = 0.0001 if "JPY" not in instrument else 0.01
+        
+        # Spread cost per trade (realistic for major pairs)
+        self.spread_pips = 1.5  # EUR_USD typical spread
 
         # Load strategy
         self.strategy = strategy or self._load_configured_strategy()
@@ -319,17 +324,20 @@ class Backtester:
         winning_trades = [t for t in trades if t.pnl_pips > 0]
         losing_trades = [t for t in trades if t.pnl_pips <= 0]
 
-        total_pips = sum(t.pnl_pips for t in trades)
+        gross_pips = sum(t.pnl_pips for t in trades)
+        spread_cost = self.spread_pips * len(trades)
+        net_pips = gross_pips - spread_cost
+        
         gross_profit = sum(t.pnl_pips for t in winning_trades)
         gross_loss = abs(sum(t.pnl_pips for t in losing_trades))
 
-        # Calculate max drawdown
+        # Calculate max drawdown (including spread)
         cumulative_pips = 0.0
         peak_pips = 0.0
         max_drawdown = 0.0
 
         for trade in trades:
-            cumulative_pips += trade.pnl_pips
+            cumulative_pips += (trade.pnl_pips - self.spread_pips)
             if cumulative_pips > peak_pips:
                 peak_pips = cumulative_pips
             drawdown = peak_pips - cumulative_pips
@@ -345,7 +353,9 @@ class Backtester:
             total_trades=len(trades),
             winning_trades=len(winning_trades),
             losing_trades=len(losing_trades),
-            total_pips=round(total_pips, 2),
+            gross_pips=round(gross_pips, 2),
+            total_pips=round(net_pips, 2),
+            spread_cost_pips=round(spread_cost, 2),
             max_drawdown_pips=round(max_drawdown, 2),
             win_rate=round(len(winning_trades) / len(trades) * 100, 2) if trades else 0,
             profit_factor=round(gross_profit / gross_loss, 2) if gross_loss > 0 else 0,
@@ -373,7 +383,9 @@ class Backtester:
             total_trades=0,
             winning_trades=0,
             losing_trades=0,
+            gross_pips=0,
             total_pips=0,
+            spread_cost_pips=0,
             max_drawdown_pips=0,
             win_rate=0,
             profit_factor=0,
@@ -392,7 +404,9 @@ class Backtester:
             "total_trades": result.total_trades,
             "winning_trades": result.winning_trades,
             "losing_trades": result.losing_trades,
+            "gross_pips": result.gross_pips,
             "total_pips": result.total_pips,
+            "spread_cost_pips": result.spread_cost_pips,
             "max_drawdown_pips": result.max_drawdown_pips,
             "win_rate": result.win_rate,
             "profit_factor": result.profit_factor,
