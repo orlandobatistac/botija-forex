@@ -85,7 +85,9 @@ async def get_dashboard(db: Session = Depends(get_db)):
                 position_units=0,
                 unrealized_pl=live_unrealized_pl,
                 is_running=False,
-                status="not_initialized"
+                status="not_initialized",
+                active_strategy=Config.ACTIVE_STRATEGY,
+                timeframe=Config.OANDA_GRANULARITY
             )
 
         return schemas.DashboardResponse(
@@ -96,7 +98,9 @@ async def get_dashboard(db: Session = Depends(get_db)):
             position_units=status.position_units,
             unrealized_pl=live_unrealized_pl or status.unrealized_pl,
             is_running=status.is_running,
-            status="ready"
+            status="ready",
+            active_strategy=Config.ACTIVE_STRATEGY,
+            timeframe=Config.OANDA_GRANULARITY
         )
     except Exception as e:
         logger.error(f"Error getting dashboard: {e}")

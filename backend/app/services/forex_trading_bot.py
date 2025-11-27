@@ -7,12 +7,15 @@ import time
 from typing import Dict, Optional
 from datetime import datetime
 
+import pandas as pd
+
 from .oanda_client import OandaClient
 from .technical_indicators import TechnicalIndicators
 from .ai_validator import AISignalValidator
 from .telegram_alerts import TelegramAlerts
 from .forex_trailing_stop import ForexTrailingStop
 from .multi_timeframe import MultiTimeframeAnalyzer
+from .strategies import TripleEMAStrategy, TripleEMASignal
 from ..config import Config
 
 logger = logging.getLogger(__name__)
@@ -38,7 +41,9 @@ class ForexTradingBot:
         take_profit_pips: float = 100,
         trailing_stop_enabled: bool = True,
         trailing_stop_distance_pips: float = 30,
-        trailing_stop_activation_pips: float = 20
+        trailing_stop_activation_pips: float = 20,
+        use_triple_ema_strategy: bool = False,
+        triple_ema_rr_ratio: float = 2.0
     ):
         """Initialize Forex trading bot"""
 
@@ -48,6 +53,17 @@ class ForexTradingBot:
 
         # OANDA client
         self.oanda = OandaClient(oanda_api_key, oanda_account_id, oanda_environment) if oanda_api_key else None
+
+        # Triple EMA Strategy (Fase 0)
+        self.use_triple_ema = use_triple_ema_strategy
+        self.triple_ema_strategy = None
+        if self.use_triple_ema:
+            self.triple_ema_strategy = TripleEMAStrategy(
+                rr_ratio=triple_ema_rr_ratio,
+                use_adx_filter=True,
+                use_slope_filter=True
+            )
+            self.logger.info("📈 Triple EMA Strategy enabled (Fase 0)")
 
         # AI and notifications (always create AI validator to show warning if not configured)
         self.ai = AISignalValidator(openai_api_key)
@@ -103,6 +119,36 @@ class ForexTradingBot:
             return self.min_balance_usd
         return balance * (self.min_balance_percent / 100)
 
+    def _candles_to_dataframe(self, candles: list) -> pd.DataFrame:
+        """Convert OANDA candles to pandas DataFrame for strategy analysis."""
+        df = pd.DataFrame(candles)
+        # Ensure required columns exist
+        required = ['open', 'high', 'low', 'close']
+        for col in required:
+            if col not in df.columns:
+                self.logger.error(f"Missing column in candles: {col}")
+                return pd.DataFrame()
+        return df
+
+    def _analyze_with_triple_ema(self, candles: list) -> TripleEMASignal:
+        """Analyze market using Triple EMA strategy."""
+        if not self.triple_ema_strategy:
+            return TripleEMASignal(direction="WAIT", reason="Strategy not initialized")
+
+        df = self._candles_to_dataframe(candles)
+        if df.empty:
+            return TripleEMASignal(direction="WAIT", reason="No valid candle data")
+
+        signal = self.triple_ema_strategy.analyze(df)
+
+        self.logger.info(
+            f"Triple EMA Signal: {signal.direction} | "
+            f"Confidence: {signal.confidence:.0%} | "
+            f"Reason: {signal.reason}"
+        )
+
+        return signal
+
     async def analyze_market(self) -> Dict:
         """Analyze current Forex market conditions"""
         try:
@@ -127,12 +173,13 @@ class ForexTradingBot:
             position_units = self.oanda.get_position_units(self.instrument)
             has_position = position_units != 0
 
-            # Get OHLC data for indicators
+            # Get OHLC data for indicators (need 250 for EMA 200)
             granularity = Config.OANDA_GRANULARITY
+            candle_count = 250 if self.use_triple_ema else 100
             candles = self.oanda.get_candles(
                 instrument=self.instrument,
                 granularity=granularity,
-                count=100
+                count=candle_count
             )
 
             if not candles:
@@ -150,7 +197,14 @@ class ForexTradingBot:
                 rsi_period=Config.RSI_PERIOD
             )
 
-            # Get AI signal
+            # ═══════════════════════════════════════════════════════════════
+            # TRIPLE EMA STRATEGY (if enabled)
+            # ═══════════════════════════════════════════════════════════════
+            triple_ema_signal = None
+            if self.use_triple_ema:
+                triple_ema_signal = self._analyze_with_triple_ema(candles)
+
+            # Get AI signal (fallback or complementary)
             if self.ai:
                 ai_signal = self.ai.get_signal(
                     instrument=self.instrument,
@@ -184,6 +238,47 @@ class ForexTradingBot:
             # Calculate units to trade
             units_to_trade = self.oanda.calculate_units_from_usd(trade_amount, self.instrument) if self.oanda else 0
 
+            # ═══════════════════════════════════════════════════════════════
+            # DECISION LOGIC: Triple EMA vs AI
+            # ═══════════════════════════════════════════════════════════════
+            if self.use_triple_ema and triple_ema_signal:
+                # Use Triple EMA strategy
+                should_buy = (
+                    triple_ema_signal.direction == 'LONG' and
+                    triple_ema_signal.confidence >= 0.6 and
+                    available_to_trade >= trade_amount and
+                    not has_position
+                )
+                should_short = (
+                    triple_ema_signal.direction == 'SHORT' and
+                    triple_ema_signal.confidence >= 0.6 and
+                    available_to_trade >= trade_amount and
+                    not has_position
+                )
+                # Use Triple EMA levels for SL/TP
+                strategy_sl = triple_ema_signal.stop_loss
+                strategy_tp = triple_ema_signal.take_profit
+                strategy_entry = triple_ema_signal.entry_price
+            else:
+                # Use AI signal (original behavior)
+                should_buy = (
+                    ai_signal['signal'] == 'BUY' and
+                    ai_signal.get('confidence', 0) >= 0.6 and
+                    mtf_confirmed and
+                    available_to_trade >= trade_amount and
+                    not has_position
+                )
+                should_short = (
+                    ai_signal['signal'] == 'SELL' and
+                    ai_signal.get('confidence', 0) >= 0.6 and
+                    mtf_confirmed and
+                    available_to_trade >= trade_amount and
+                    not has_position
+                )
+                strategy_sl = None
+                strategy_tp = None
+                strategy_entry = None
+
             return {
                 'timestamp': datetime.now().isoformat(),
                 'instrument': self.instrument,
@@ -197,31 +292,24 @@ class ForexTradingBot:
                 'has_position': has_position,
                 'tech_signals': tech_signals,
                 'ai_signal': ai_signal,
+                'triple_ema_signal': triple_ema_signal.to_dict() if triple_ema_signal else None,
                 'mtf_signal': mtf_signal,
                 'mtf_confirmed': mtf_confirmed,
                 'trade_amount_usd': trade_amount,
                 'units_to_trade': units_to_trade,
                 'min_balance_required': min_balance_required,
                 'available_to_trade': available_to_trade,
-                'should_buy': (
-                    ai_signal['signal'] == 'BUY' and
-                    ai_signal.get('confidence', 0) >= 0.6 and
-                    mtf_confirmed and  # Multi-timeframe confirmation
-                    available_to_trade >= trade_amount and
-                    not has_position
-                ),
+                # Strategy-calculated levels
+                'strategy_entry': strategy_entry,
+                'strategy_sl': strategy_sl,
+                'strategy_tp': strategy_tp,
+                'should_buy': should_buy,
                 'should_sell': (
                     ai_signal['signal'] == 'SELL' and
                     has_position and
                     position_units > 0  # Long position to close
                 ),
-                'should_short': (
-                    ai_signal['signal'] == 'SELL' and
-                    ai_signal.get('confidence', 0) >= 0.6 and
-                    mtf_confirmed and  # Multi-timeframe confirmation
-                    available_to_trade >= trade_amount and
-                    not has_position
-                ),
+                'should_short': should_short,
                 'should_cover': (
                     ai_signal['signal'] == 'BUY' and
                     has_position and
@@ -266,12 +354,27 @@ class ForexTradingBot:
 
             self.logger.info(f"Executing BUY: {units} units {self.instrument}")
 
-            result = self.oanda.place_market_order(
-                instrument=self.instrument,
-                units=units,  # Positive = buy/long
-                stop_loss_pips=self.stop_loss_pips if self.stop_loss_pips > 0 else None,
-                take_profit_pips=self.take_profit_pips if self.take_profit_pips > 0 else None
-            )
+            # Use strategy SL/TP if available (Triple EMA), otherwise use default pips
+            strategy_sl = analysis.get('strategy_sl')
+            strategy_tp = analysis.get('strategy_tp')
+
+            if strategy_sl and strategy_tp:
+                # Triple EMA provides absolute price levels
+                self.logger.info(f"Using Triple EMA levels - SL: {strategy_sl}, TP: {strategy_tp}")
+                result = self.oanda.place_market_order(
+                    instrument=self.instrument,
+                    units=units,
+                    stop_loss_price=strategy_sl,
+                    take_profit_price=strategy_tp
+                )
+            else:
+                # Default: use pips
+                result = self.oanda.place_market_order(
+                    instrument=self.instrument,
+                    units=units,
+                    stop_loss_pips=self.stop_loss_pips if self.stop_loss_pips > 0 else None,
+                    take_profit_pips=self.take_profit_pips if self.take_profit_pips > 0 else None
+                )
 
             if result['success']:
                 self.logger.info(f"BUY executed: {result}")
@@ -346,12 +449,27 @@ class ForexTradingBot:
 
             self.logger.info(f"Executing SHORT: {units} units {self.instrument}")
 
-            result = self.oanda.place_market_order(
-                instrument=self.instrument,
-                units=-units,  # Negative = sell/short
-                stop_loss_pips=self.stop_loss_pips if self.stop_loss_pips > 0 else None,
-                take_profit_pips=self.take_profit_pips if self.take_profit_pips > 0 else None
-            )
+            # Use strategy SL/TP if available (Triple EMA), otherwise use default pips
+            strategy_sl = analysis.get('strategy_sl')
+            strategy_tp = analysis.get('strategy_tp')
+
+            if strategy_sl and strategy_tp:
+                # Triple EMA provides absolute price levels
+                self.logger.info(f"Using Triple EMA levels - SL: {strategy_sl}, TP: {strategy_tp}")
+                result = self.oanda.place_market_order(
+                    instrument=self.instrument,
+                    units=-units,  # Negative = sell/short
+                    stop_loss_price=strategy_sl,
+                    take_profit_price=strategy_tp
+                )
+            else:
+                # Default: use pips
+                result = self.oanda.place_market_order(
+                    instrument=self.instrument,
+                    units=-units,
+                    stop_loss_pips=self.stop_loss_pips if self.stop_loss_pips > 0 else None,
+                    take_profit_pips=self.take_profit_pips if self.take_profit_pips > 0 else None
+                )
 
             if result['success']:
                 self.logger.info(f"SHORT executed: {result}")

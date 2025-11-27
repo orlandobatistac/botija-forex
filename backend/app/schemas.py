@@ -150,6 +150,8 @@ class DashboardResponse(BaseModel):
     last_price: Optional[float] = None
     spread_pips: Optional[float] = None
     status: str = "ready"
+    active_strategy: str = "Triple EMA"
+    timeframe: str = "H4"
 
 
 class MarketAnalysis(BaseModel):

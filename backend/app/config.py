@@ -64,6 +64,10 @@ class Config:
     # Multi-Timeframe Analysis
     MULTI_TIMEFRAME_ENABLED = os.getenv("MULTI_TIMEFRAME_ENABLED", "true").lower() == "true"
 
+    # Active Strategy
+    ACTIVE_STRATEGY = os.getenv("ACTIVE_STRATEGY", "Triple EMA")
+    USE_TRIPLE_EMA_STRATEGY = os.getenv("USE_TRIPLE_EMA_STRATEGY", "true").lower() == "true"
+
     # Database
     DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./botija-forex.db")
 
