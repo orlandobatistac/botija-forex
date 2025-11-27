@@ -35,12 +35,12 @@ class Config:
     # Account settings
     ACCOUNT_LEVERAGE = int(os.getenv("ACCOUNT_LEVERAGE", 50))  # e.g., 50 for 50:1
 
-    # Position sizing (percentage-based on margin, not notional)
-    MARGIN_PERCENT = float(os.getenv("MARGIN_PERCENT", 2))  # % of balance to use as margin per trade
-    MIN_BALANCE_PERCENT = float(os.getenv("MIN_BALANCE_PERCENT", 20))  # % to keep as reserve
-
-    # Legacy (deprecated, use MARGIN_PERCENT instead)
+    # Position sizing
+    # TRADE_AMOUNT_PERCENT = % of balance to use as MARGIN per trade
+    # Notional = margin × leverage
+    # Example: 10% of $100k = $10k margin → $10k × 50 = $500k notional
     TRADE_AMOUNT_PERCENT = float(os.getenv("TRADE_AMOUNT_PERCENT", 10))
+    MIN_BALANCE_PERCENT = float(os.getenv("MIN_BALANCE_PERCENT", 20))  # % to keep as reserve
 
     # Risk management (pips)
     STOP_LOSS_PIPS = float(os.getenv("STOP_LOSS_PIPS", 50))
