@@ -514,7 +514,7 @@ class ForexTradingBot:
             'price': 0,
             'ema_fast': 0,
             'ema_slow': 0,
-            'rsi': 0,
+            'ema_trend': 0,
             'balance': 0,
             'position_units': 0,
             'ai_signal': 'NEUTRAL',
@@ -547,7 +547,7 @@ class ForexTradingBot:
             tech = analysis.get('tech_signals', {})
             cycle_data['ema_fast'] = tech.get('ema20', 0)
             cycle_data['ema_slow'] = tech.get('ema50', 0)
-            cycle_data['rsi'] = tech.get('rsi14', 0)
+            cycle_data['ema_trend'] = tech.get('ema200', 0)
 
             # Signal: use Triple EMA if enabled, otherwise AI
             triple_ema_result = analysis.get('triple_ema_signal')
@@ -679,7 +679,7 @@ class ForexTradingBot:
                 price=cycle_data['price'],
                 ema_fast=cycle_data['ema_fast'],
                 ema_slow=cycle_data['ema_slow'],
-                rsi=cycle_data['rsi'],
+                ema_trend=cycle_data['ema_trend'],
                 balance=cycle_data['balance'],
                 position_units=cycle_data['position_units'],
                 ai_signal=cycle_data['ai_signal'],

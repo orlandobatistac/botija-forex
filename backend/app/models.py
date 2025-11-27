@@ -62,9 +62,9 @@ class TradingCycle(Base):
     spread_pips = Column(Float, nullable=True)
 
     # Technical indicators
-    ema_fast = Column(Float)
-    ema_slow = Column(Float)
-    rsi = Column(Float)
+    ema_fast = Column(Float)   # EMA 20
+    ema_slow = Column(Float)   # EMA 50
+    ema_trend = Column(Float)  # EMA 200
 
     # Account state
     balance = Column(Float)

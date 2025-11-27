@@ -80,21 +80,24 @@ class TechnicalIndicators:
         prices: List[float],
         ema20_period: int = 20,
         ema50_period: int = 50,
+        ema200_period: int = 200,
         rsi_period: int = 14
     ) -> Dict:
         """Analyze current signals from price data"""
-        if len(prices) < max(ema50_period, rsi_period) + 1:
+        if len(prices) < max(ema200_period, rsi_period) + 1:
             return {}
         
         try:
             # Calculate indicators
             ema20 = TechnicalIndicators.calculate_ema(prices, ema20_period)
             ema50 = TechnicalIndicators.calculate_ema(prices, ema50_period)
+            ema200 = TechnicalIndicators.calculate_ema(prices, ema200_period)
             rsi = TechnicalIndicators.calculate_rsi(prices, rsi_period)
             
             current_price = prices[-1]
             current_ema20 = ema20[-1] if ema20 else 0
             current_ema50 = ema50[-1] if ema50 else 0
+            current_ema200 = ema200[-1] if ema200 else 0
             current_rsi = rsi[-1] if rsi else 0
             
             # Determine signal
@@ -106,8 +109,9 @@ class TechnicalIndicators:
             
             return {
                 'current_price': current_price,
-                'ema20': round(current_ema20, 2),
-                'ema50': round(current_ema50, 2),
+                'ema20': round(current_ema20, 5),
+                'ema50': round(current_ema50, 5),
+                'ema200': round(current_ema200, 5),
                 'rsi14': round(current_rsi, 2),
                 'signal': signal,
                 'ema20_gt_ema50': current_ema20 > current_ema50,

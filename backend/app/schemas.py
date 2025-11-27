@@ -76,7 +76,7 @@ class TradingCycleBase(BaseModel):
     price: float
     ema_fast: float
     ema_slow: float
-    rsi: float
+    ema_trend: float
     balance: float
     position_units: int
     ai_signal: str
