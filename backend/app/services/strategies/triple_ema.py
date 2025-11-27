@@ -64,6 +64,7 @@ class TripleEMAStrategy:
 
     Simple, probada, rentable con disciplina.
     Incluye filtros anti-lateral (ADX, slope).
+    SL dinámico basado en ATR para adaptarse a volatilidad.
     """
 
     def __init__(
@@ -71,14 +72,17 @@ class TripleEMAStrategy:
         ema_fast: int = 20,
         ema_medium: int = 50,
         ema_slow: int = 200,
-        rr_ratio: float = 2.0,
+        rr_ratio: float = 3.0,  # Aumentado a 1:3 para compensar bajo win rate
         ema50_tolerance_pips: float = 15.0,
-        sl_buffer_pips: float = 5.0,
+        sl_buffer_pips: float = 5.0,  # Solo se usa si use_atr_sl=False
+        atr_sl_multiplier: float = 1.5,  # SL = ATR * 1.5
+        use_atr_sl: bool = True,  # Usar ATR para SL dinámico
         min_ema_slope: float = 0.0001,
-        min_adx: float = 20.0,
+        min_adx: float = 25.0,  # Aumentado de 20 a 25 para filtrar más
         use_adx_filter: bool = True,
         use_slope_filter: bool = True,
-        slope_lookback: int = 10
+        slope_lookback: int = 10,
+        atr_period: int = 14
     ):
         """
         Inicializa la estrategia.
@@ -87,14 +91,17 @@ class TripleEMAStrategy:
             ema_fast: Período EMA rápida (default: 20)
             ema_medium: Período EMA media (default: 50)
             ema_slow: Período EMA lenta (default: 200)
-            rr_ratio: Ratio Risk:Reward (default: 2.0 = 1:2)
+            rr_ratio: Ratio Risk:Reward (default: 3.0 = 1:3)
             ema50_tolerance_pips: Distancia máxima a EMA 50 para considerar pullback
-            sl_buffer_pips: Buffer adicional para SL
+            sl_buffer_pips: Buffer adicional para SL (si no usa ATR)
+            atr_sl_multiplier: Multiplicador ATR para SL dinámico
+            use_atr_sl: Si usar ATR para calcular SL
             min_ema_slope: Pendiente mínima de EMA 50 para confirmar tendencia
-            min_adx: ADX mínimo para confirmar tendencia (< 20 = lateral)
+            min_adx: ADX mínimo para confirmar tendencia (< 25 = lateral/débil)
             use_adx_filter: Si usar filtro ADX
             use_slope_filter: Si usar filtro de pendiente
             slope_lookback: Períodos para calcular pendiente
+            atr_period: Período para calcular ATR
         """
         self.ema_fast = ema_fast
         self.ema_medium = ema_medium
@@ -102,16 +109,19 @@ class TripleEMAStrategy:
         self.rr_ratio = rr_ratio
         self.ema50_tolerance_pips = ema50_tolerance_pips
         self.sl_buffer_pips = sl_buffer_pips
+        self.atr_sl_multiplier = atr_sl_multiplier
+        self.use_atr_sl = use_atr_sl
         self.min_ema_slope = min_ema_slope
         self.min_adx = min_adx
         self.use_adx_filter = use_adx_filter
         self.use_slope_filter = use_slope_filter
         self.slope_lookback = slope_lookback
+        self.atr_period = atr_period
 
         logger.info(
             f"TripleEMAStrategy initialized: "
             f"EMA({ema_fast}/{ema_medium}/{ema_slow}), "
-            f"R:R 1:{rr_ratio}, ADX filter: {use_adx_filter}"
+            f"R:R 1:{rr_ratio}, ADX>{min_adx}, ATR SL: {use_atr_sl}"
         )
 
     def calculate_emas(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -121,6 +131,26 @@ class TripleEMAStrategy:
         df['ema_50'] = df['close'].ewm(span=self.ema_medium, adjust=False).mean()
         df['ema_200'] = df['close'].ewm(span=self.ema_slow, adjust=False).mean()
         return df
+
+    def calculate_atr(self, df: pd.DataFrame) -> float:
+        """
+        Calcula ATR (Average True Range) para SL dinámico.
+
+        ATR mide volatilidad - SL más amplio en mercados volátiles,
+        más ajustado en mercados tranquilos.
+        """
+        high = df['high']
+        low = df['low']
+        close = df['close'].shift(1)
+
+        tr1 = high - low
+        tr2 = abs(high - close)
+        tr3 = abs(low - close)
+
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        atr = tr.rolling(self.atr_period).mean().iloc[-1]
+
+        return atr if not np.isnan(atr) else 0.0
 
     def calculate_adx(self, df: pd.DataFrame, period: int = 14) -> float:
         """
@@ -326,27 +356,39 @@ class TripleEMAStrategy:
     def calculate_levels(
         self,
         current: pd.Series,
-        direction: str
+        direction: str,
+        atr: float = 0.0
     ) -> tuple[float, float, float]:
         """
         Calcula Entry, SL y TP.
+
+        Si use_atr_sl=True, usa ATR para calcular SL dinámico.
+        Esto da más espacio al trade en mercados volátiles.
 
         Returns:
             (entry, stop_loss, take_profit)
         """
         pip_value = 0.0001 if current['close'] < 10 else 0.01
-        buffer = self.sl_buffer_pips * pip_value
-
         entry = current['close']
 
+        # Calcular distancia del SL
+        if self.use_atr_sl and atr > 0:
+            # SL dinámico basado en ATR
+            sl_distance = atr * self.atr_sl_multiplier
+        else:
+            # SL fijo basado en buffer + swing high/low
+            buffer = self.sl_buffer_pips * pip_value
+            if direction == "LONG":
+                sl_distance = entry - (current['low'] - buffer)
+            else:
+                sl_distance = (current['high'] + buffer) - entry
+
         if direction == "LONG":
-            stop_loss = current['low'] - buffer
-            risk = entry - stop_loss
-            take_profit = entry + (risk * self.rr_ratio)
+            stop_loss = entry - sl_distance
+            take_profit = entry + (sl_distance * self.rr_ratio)
         else:  # SHORT
-            stop_loss = current['high'] + buffer
-            risk = stop_loss - entry
-            take_profit = entry - (risk * self.rr_ratio)
+            stop_loss = entry + sl_distance
+            take_profit = entry - (sl_distance * self.rr_ratio)
 
         return (
             round(entry, 5),
@@ -474,9 +516,12 @@ class TripleEMAStrategy:
         # 🎯 SEÑAL CONFIRMADA
         # ═══════════════════════════════════════════════════════════════
 
-        # Calcular niveles
+        # Calcular ATR para SL dinámico
+        atr = self.calculate_atr(df)
+
+        # Calcular niveles con ATR
         entry, stop_loss, take_profit = self.calculate_levels(
-            current, potential_direction
+            current, potential_direction, atr
         )
 
         # Calcular confianza
