@@ -384,67 +384,67 @@
           </div>
         </div>
 
-        <!-- Active Position -->
+        <!-- Active Positions -->
         <div
           class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl border border-yellow-700/50 p-6 mb-6 shadow-lg"
         >
           <div class="flex justify-between items-center mb-6">
             <h2 class="text-xl font-bold flex items-center gap-2">
-              <span>📍</span> Active Position
+              <span>📍</span> Active Positions
             </h2>
             <button
-              @click="fetchPosition()"
+              @click="fetchPositions()"
               class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
             >
               🔄 Refresh
             </button>
           </div>
-          <div x-show="activePosition && activePosition.has_position">
-            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              <!-- Instrument -->
-              <div class="bg-gray-700/50 rounded-lg p-4">
-                <div class="text-xs text-gray-400 mb-1">Instrument</div>
-                <div class="text-lg font-bold text-orange-400" x-text="activePosition.position?.instrument || '-'"></div>
-              </div>
-              <!-- Side -->
-              <div class="bg-gray-700/50 rounded-lg p-4">
-                <div class="text-xs text-gray-400 mb-1">Side</div>
-                <div class="text-lg font-bold" 
-                     :class="activePosition.position?.side === 'LONG' ? 'text-green-400' : 'text-red-400'"
-                     x-text="activePosition.position?.side || '-'"></div>
-              </div>
-              <!-- Units -->
-              <div class="bg-gray-700/50 rounded-lg p-4">
-                <div class="text-xs text-gray-400 mb-1">Units</div>
-                <div class="text-lg font-bold text-blue-400" x-text="formatNumber(activePosition.position?.units || 0, 0)"></div>
-              </div>
-              <!-- Entry Price -->
-              <div class="bg-gray-700/50 rounded-lg p-4">
-                <div class="text-xs text-gray-400 mb-1">Entry Price</div>
-                <div class="text-lg font-bold text-gray-200" x-text="formatPrice(activePosition.position?.entry_price || 0)"></div>
-              </div>
-              <!-- Current Price -->
-              <div class="bg-gray-700/50 rounded-lg p-4">
-                <div class="text-xs text-gray-400 mb-1">Current Price</div>
-                <div class="text-lg font-bold text-cyan-400" x-text="formatPrice(activePosition.position?.current_price || 0)"></div>
-              </div>
-              <!-- Unrealized P/L -->
-              <div class="bg-gray-700/50 rounded-lg p-4">
-                <div class="text-xs text-gray-400 mb-1">Unrealized P/L</div>
-                <div class="text-lg font-bold" 
-                     :class="(activePosition.position?.unrealized_pl || 0) >= 0 ? 'text-green-400' : 'text-red-400'">
-                  <span x-text="formatUSD(activePosition.position?.unrealized_pl || 0)"></span>
-                  <span class="text-xs ml-1" x-text="'(' + (activePosition.position?.pl_pips || 0) + ' pips)'"></span>
-                </div>
-              </div>
-            </div>
+          <div x-show="positions.length > 0" class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-700/50 border-b border-gray-600">
+                <tr>
+                  <th class="px-4 py-3 text-left">Instrument</th>
+                  <th class="px-4 py-3 text-left">Side</th>
+                  <th class="px-4 py-3 text-left">Units</th>
+                  <th class="px-4 py-3 text-left">Entry Price</th>
+                  <th class="px-4 py-3 text-left">Current Price</th>
+                  <th class="px-4 py-3 text-left">Unrealized P/L</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-700">
+                <template x-for="(pos, index) in positions" :key="'pos-' + index">
+                  <tr class="hover:bg-gray-700/30 transition-colors">
+                    <td class="px-4 py-3 font-bold text-orange-400" x-text="pos.instrument"></td>
+                    <td class="px-4 py-3">
+                      <span
+                        :class="pos.side === 'LONG' ? 'bg-green-600' : 'bg-red-600'"
+                        class="px-2 py-1 rounded text-xs font-bold"
+                        x-text="pos.side"
+                      ></span>
+                    </td>
+                    <td class="px-4 py-3 text-blue-400 font-semibold" x-text="formatNumber(pos.units, 0)"></td>
+                    <td class="px-4 py-3 text-gray-200" x-text="formatPrice(pos.entry_price)"></td>
+                    <td class="px-4 py-3 text-cyan-400" x-text="formatPrice(pos.current_price)"></td>
+                    <td class="px-4 py-3">
+                      <span
+                        :class="pos.unrealized_pl >= 0 ? 'text-green-400' : 'text-red-400'"
+                        class="font-bold"
+                      >
+                        <span x-text="formatUSD(pos.unrealized_pl)"></span>
+                        <span class="text-xs ml-1 text-gray-400" x-text="'(' + pos.pl_pips + ' pips)'"></span>
+                      </span>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
           </div>
           <div
-            x-show="!activePosition || !activePosition.has_position"
+            x-show="positions.length === 0"
             class="text-gray-500 text-center py-8"
           >
             <div class="text-4xl mb-3">📭</div>
-            <div class="text-lg">No active position</div>
+            <div class="text-lg">No active positions</div>
             <div class="text-sm mt-2">Waiting for trade signal...</div>
           </div>
         </div>
@@ -656,7 +656,7 @@
           logLevel: '',
           manualCycleRunning: false,
           lastUpdate: new Date().toISOString(),
-          activePosition: { has_position: false, position: null },
+          positions: [],
 
           // Computed: time since last cycle
           get timeSinceLastCycle() {
@@ -765,7 +765,7 @@
             await this.refreshStatus();
             await this.fetchLogs();
             await this.fetchCycles();
-            await this.fetchPosition();
+            await this.fetchPositions();
 
             // Refresh status every 10 seconds
             setInterval(() => this.refreshStatus(), 10000);
@@ -773,8 +773,8 @@
             // Refresh cycles every 10 seconds
             setInterval(() => this.fetchCycles(), 10000);
 
-            // Refresh position every 30 seconds
-            setInterval(() => this.fetchPosition(), 30000);
+            // Refresh positions every 30 seconds
+            setInterval(() => this.fetchPositions(), 30000);
 
             // Local countdown decrement every second
             setInterval(() => {
@@ -876,14 +876,15 @@
             }
           },
 
-          async fetchPosition() {
+          async fetchPositions() {
             try {
-              const response = await fetch("/api/v1/bot/position");
+              const response = await fetch("/api/v1/bot/positions");
               if (response.ok) {
-                this.activePosition = await response.json();
+                const data = await response.json();
+                this.positions = data.positions || [];
               }
             } catch (err) {
-              console.error("Error fetching position:", err);
+              console.error("Error fetching positions:", err);
             }
           },
 
