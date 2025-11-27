@@ -476,6 +476,19 @@ class OandaClient:
             return []
         return response.get("trades", [])
 
+    def get_closed_trades(self, count: int = 50) -> List[Dict]:
+        """
+        Get recently closed trades from OANDA
+        
+        Args:
+            count: Number of trades to fetch (max 500)
+        """
+        params = {"state": "CLOSED", "count": min(count, 500)}
+        response = self._request("GET", f"/v3/accounts/{self.account_id}/trades", params=params)
+        if "error" in response:
+            return []
+        return response.get("trades", [])
+
     def get_trade(self, trade_id: str) -> Optional[Dict]:
         """Get specific trade details"""
         response = self._request("GET", f"/v3/accounts/{self.account_id}/trades/{trade_id}")

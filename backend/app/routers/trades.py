@@ -87,3 +87,77 @@ async def get_trade_stats(
         "average_profit": avg_profit,
         "average_loss": avg_loss
     }
+
+
+@router.post("/sync")
+async def sync_trades_from_oanda(db: Session = Depends(get_db)):
+    """
+    Sync closed trades from OANDA to local database.
+    This captures trades closed manually on OANDA platform.
+    """
+    from ..services.oanda_client import OandaClient
+    from ..config import settings
+    from datetime import datetime
+    
+    try:
+        oanda = OandaClient(
+            api_key=settings.OANDA_API_KEY,
+            account_id=settings.OANDA_ACCOUNT_ID,
+            environment=settings.OANDA_ENVIRONMENT
+        )
+        
+        closed_trades = oanda.get_closed_trades(count=50)
+        synced = 0
+        
+        for trade in closed_trades:
+            trade_id = trade.get("id")
+            
+            # Check if trade already exists
+            existing = db.query(models.Trade).filter(
+                models.Trade.trade_id == trade_id
+            ).first()
+            
+            if existing:
+                # Update if closed but not recorded
+                if existing.status != "CLOSED":
+                    existing.status = "CLOSED"
+                    existing.exit_price = float(trade.get("averageClosePrice", 0))
+                    existing.profit_loss = float(trade.get("realizedPL", 0))
+                    existing.closed_at = datetime.fromisoformat(
+                        trade.get("closeTime", "").replace("Z", "+00:00")
+                    ) if trade.get("closeTime") else datetime.utcnow()
+                    synced += 1
+            else:
+                # Create new trade record
+                units = int(trade.get("initialUnits", 0))
+                new_trade = models.Trade(
+                    trade_id=trade_id,
+                    order_type="BUY" if units > 0 else "SELL",
+                    instrument=trade.get("instrument", "EUR_USD"),
+                    entry_price=float(trade.get("price", 0)),
+                    exit_price=float(trade.get("averageClosePrice", 0)),
+                    units=abs(units),
+                    profit_loss=float(trade.get("realizedPL", 0)),
+                    status="CLOSED",
+                    trading_mode="DEMO" if "practice" in settings.OANDA_ENVIRONMENT else "LIVE",
+                    created_at=datetime.fromisoformat(
+                        trade.get("openTime", "").replace("Z", "+00:00")
+                    ) if trade.get("openTime") else datetime.utcnow(),
+                    closed_at=datetime.fromisoformat(
+                        trade.get("closeTime", "").replace("Z", "+00:00")
+                    ) if trade.get("closeTime") else datetime.utcnow(),
+                    notes="Synced from OANDA"
+                )
+                db.add(new_trade)
+                synced += 1
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "synced": synced,
+            "total_checked": len(closed_trades)
+        }
+        
+    except Exception as e:
+        return {"success": False, "error": str(e)}
