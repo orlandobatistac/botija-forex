@@ -403,36 +403,53 @@
             <table class="w-full text-sm">
               <thead class="bg-gray-700/50 border-b border-gray-600">
                 <tr>
-                  <th class="px-4 py-3 text-left">Instrument</th>
-                  <th class="px-4 py-3 text-left">Side</th>
-                  <th class="px-4 py-3 text-left">Units</th>
-                  <th class="px-4 py-3 text-left">Entry Price</th>
-                  <th class="px-4 py-3 text-left">Current Price</th>
-                  <th class="px-4 py-3 text-left">Unrealized P/L</th>
+                  <th class="px-3 py-3 text-left">Instrument</th>
+                  <th class="px-3 py-3 text-left">Side</th>
+                  <th class="px-3 py-3 text-right">Units</th>
+                  <th class="px-3 py-3 text-right">Entry</th>
+                  <th class="px-3 py-3 text-right">Current</th>
+                  <th class="px-3 py-3 text-right">P/L</th>
+                  <th class="px-3 py-3 text-left">Duration</th>
+                  <th class="px-3 py-3 text-right">SL</th>
+                  <th class="px-3 py-3 text-right">TP</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-700">
                 <template x-for="(pos, index) in positions" :key="'pos-' + index">
                   <tr class="hover:bg-gray-700/30 transition-colors">
-                    <td class="px-4 py-3 font-bold text-orange-400" x-text="pos.instrument"></td>
-                    <td class="px-4 py-3">
+                    <td class="px-3 py-3">
+                      <div class="font-bold text-orange-400" x-text="pos.instrument"></div>
+                      <div class="text-xs text-gray-500" x-text="'#' + pos.trade_id"></div>
+                    </td>
+                    <td class="px-3 py-3">
                       <span
                         :class="pos.side === 'LONG' ? 'bg-green-600' : 'bg-red-600'"
                         class="px-2 py-1 rounded text-xs font-bold"
                         x-text="pos.side"
                       ></span>
                     </td>
-                    <td class="px-4 py-3 text-blue-400 font-semibold" x-text="formatNumber(pos.units, 0)"></td>
-                    <td class="px-4 py-3 text-gray-200" x-text="formatPrice(pos.entry_price)"></td>
-                    <td class="px-4 py-3 text-cyan-400" x-text="formatPrice(pos.current_price)"></td>
-                    <td class="px-4 py-3">
-                      <span
+                    <td class="px-3 py-3 text-right text-blue-400 font-semibold" x-text="formatNumber(pos.units, 0)"></td>
+                    <td class="px-3 py-3 text-right text-gray-200" x-text="formatPrice(pos.entry_price)"></td>
+                    <td class="px-3 py-3 text-right text-cyan-400" x-text="formatPrice(pos.current_price)"></td>
+                    <td class="px-3 py-3 text-right">
+                      <div
                         :class="pos.unrealized_pl >= 0 ? 'text-green-400' : 'text-red-400'"
                         class="font-bold"
-                      >
-                        <span x-text="formatUSD(pos.unrealized_pl)"></span>
-                        <span class="text-xs ml-1 text-gray-400" x-text="'(' + pos.pl_pips + ' pips)'"></span>
-                      </span>
+                        x-text="formatUSD(pos.unrealized_pl)"
+                      ></div>
+                      <div class="text-xs text-gray-400" x-text="pos.pl_pips + ' pips'"></div>
+                    </td>
+                    <td class="px-3 py-3">
+                      <div class="text-yellow-400 font-semibold" x-text="pos.duration"></div>
+                      <div class="text-xs text-gray-500" x-text="formatDateTime(pos.open_time)"></div>
+                    </td>
+                    <td class="px-3 py-3 text-right">
+                      <span x-show="pos.stop_loss" class="text-red-400" x-text="formatPrice(pos.stop_loss)"></span>
+                      <span x-show="!pos.stop_loss" class="text-gray-600">—</span>
+                    </td>
+                    <td class="px-3 py-3 text-right">
+                      <span x-show="pos.take_profit" class="text-green-400" x-text="formatPrice(pos.take_profit)"></span>
+                      <span x-show="!pos.take_profit" class="text-gray-600">—</span>
                     </td>
                   </tr>
                 </template>
@@ -729,6 +746,22 @@
           formatPrice(price) {
             if (price == null || isNaN(price)) return "0.00000";
             return parseFloat(price).toFixed(5);
+          },
+
+          // Format date time (OANDA format to local)
+          formatDateTime(isoString) {
+            if (!isoString) return "";
+            try {
+              const date = new Date(isoString);
+              return date.toLocaleString("en-US", {
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit"
+              });
+            } catch (e) {
+              return "";
+            }
           },
 
           // Format position units

@@ -125,60 +125,103 @@ async def stop_bot():
 
 @router.get("/positions")
 async def get_active_positions():
-    """Get all active positions from OANDA"""
+    """Get all active positions/trades from OANDA with detailed info"""
+    from datetime import datetime, timezone
+
     try:
         bot = get_trading_bot()
         if not bot or not bot.oanda:
             return {"positions": [], "count": 0}
 
-        open_positions = bot.oanda.get_open_positions()
-        if not open_positions:
+        # Use open trades for more detailed info (includes openTime, tradeId, etc.)
+        open_trades = bot.oanda.get_open_trades()
+        if not open_trades:
             return {"positions": [], "count": 0}
 
         positions_list = []
+        now = datetime.now(timezone.utc)
 
-        for pos in open_positions:
-            instrument = pos.get("instrument", "")
-            long_units = int(pos.get("long", {}).get("units", 0))
-            short_units = int(pos.get("short", {}).get("units", 0))
+        for trade in open_trades:
+            instrument = trade.get("instrument", "")
+            units = int(trade.get("currentUnits", 0))
+            trade_id = trade.get("id", "")
+            open_time_str = trade.get("openTime", "")
+            entry_price = float(trade.get("price", 0))
+            unrealized_pl = float(trade.get("unrealizedPL", 0))
+
+            # Determine side
+            side = "LONG" if units > 0 else "SHORT"
+            units = abs(units)
 
             # Get current price
             pricing = bot.oanda.get_spread(instrument)
             current_price = pricing.get("mid", 0) if pricing else 0
+            spread_pips = pricing.get("spread_pips", 0) if pricing else 0
 
-            # Process long position
-            if long_units > 0:
-                avg_price = float(pos.get("long", {}).get("averagePrice", 0))
-                unrealized_pl = float(pos.get("long", {}).get("unrealizedPL", 0))
-                pip_multiplier = 10000 if "JPY" not in instrument else 100
-                pl_pips = (current_price - avg_price) * pip_multiplier if avg_price > 0 else 0
+            # Calculate P/L in pips
+            pip_multiplier = 10000 if "JPY" not in instrument else 100
+            if side == "LONG":
+                pl_pips = (current_price - entry_price) * pip_multiplier if entry_price > 0 else 0
+            else:
+                pl_pips = (entry_price - current_price) * pip_multiplier if entry_price > 0 else 0
 
-                positions_list.append({
-                    "instrument": instrument,
-                    "side": "LONG",
-                    "units": long_units,
-                    "entry_price": avg_price,
-                    "current_price": current_price,
-                    "unrealized_pl": unrealized_pl,
-                    "pl_pips": round(pl_pips, 1)
-                })
+            # Parse open time and calculate duration
+            open_time = None
+            duration_str = "N/A"
+            duration_seconds = 0
+            if open_time_str:
+                try:
+                    # OANDA format: 2025-11-27T01:23:45.123456789Z
+                    open_time = datetime.fromisoformat(open_time_str.replace('Z', '+00:00'))
+                    delta = now - open_time
+                    duration_seconds = int(delta.total_seconds())
 
-            # Process short position
-            if short_units < 0:
-                avg_price = float(pos.get("short", {}).get("averagePrice", 0))
-                unrealized_pl = float(pos.get("short", {}).get("unrealizedPL", 0))
-                pip_multiplier = 10000 if "JPY" not in instrument else 100
-                pl_pips = (avg_price - current_price) * pip_multiplier if avg_price > 0 else 0
+                    days = delta.days
+                    hours, remainder = divmod(delta.seconds, 3600)
+                    minutes, _ = divmod(remainder, 60)
 
-                positions_list.append({
-                    "instrument": instrument,
-                    "side": "SHORT",
-                    "units": abs(short_units),
-                    "entry_price": avg_price,
-                    "current_price": current_price,
-                    "unrealized_pl": unrealized_pl,
-                    "pl_pips": round(pl_pips, 1)
-                })
+                    if days > 0:
+                        duration_str = f"{days}d {hours}h {minutes}m"
+                    elif hours > 0:
+                        duration_str = f"{hours}h {minutes}m"
+                    else:
+                        duration_str = f"{minutes}m"
+                except Exception:
+                    pass
+
+            # Get stop loss and take profit if set
+            stop_loss = trade.get("stopLossOrder", {}).get("price")
+            take_profit = trade.get("takeProfitOrder", {}).get("price")
+            trailing_stop = trade.get("trailingStopLossOrder", {}).get("distance")
+
+            # Calculate margin used (approximate)
+            margin_used = float(trade.get("marginUsed", 0))
+
+            # Calculate initial value
+            initial_value = entry_price * units
+
+            positions_list.append({
+                "trade_id": trade_id,
+                "instrument": instrument,
+                "side": side,
+                "units": units,
+                "entry_price": entry_price,
+                "current_price": current_price,
+                "unrealized_pl": unrealized_pl,
+                "pl_pips": round(pl_pips, 1),
+                "open_time": open_time_str,
+                "duration": duration_str,
+                "duration_seconds": duration_seconds,
+                "stop_loss": float(stop_loss) if stop_loss else None,
+                "take_profit": float(take_profit) if take_profit else None,
+                "trailing_stop_pips": float(trailing_stop) * pip_multiplier if trailing_stop else None,
+                "margin_used": margin_used,
+                "spread_pips": round(spread_pips, 1),
+                "initial_value": round(initial_value, 2)
+            })
+
+        # Sort by open time (newest first)
+        positions_list.sort(key=lambda x: x.get("open_time", ""), reverse=True)
 
         return {"positions": positions_list, "count": len(positions_list)}
     except Exception as e:
