@@ -15,7 +15,7 @@ from .ai_validator import AISignalValidator
 from .telegram_alerts import TelegramAlerts
 from .forex_trailing_stop import ForexTrailingStop
 from .multi_timeframe import MultiTimeframeAnalyzer
-from .strategies import TripleEMAStrategy, TripleEMASignal
+from .strategies.registry import load_strategy, get_strategy_list
 from ..config import Config
 
 logger = logging.getLogger(__name__)
@@ -54,16 +54,10 @@ class ForexTradingBot:
         # OANDA client
         self.oanda = OandaClient(oanda_api_key, oanda_account_id, oanda_environment) if oanda_api_key else None
 
-        # Triple EMA Strategy (Fase 0)
-        self.use_triple_ema = use_triple_ema_strategy
-        self.triple_ema_strategy = None
-        if self.use_triple_ema:
-            self.triple_ema_strategy = TripleEMAStrategy(
-                rr_ratio=triple_ema_rr_ratio,
-                use_adx_filter=True,
-                use_slope_filter=True
-            )
-            self.logger.info("📈 Triple EMA Strategy enabled (Fase 0)")
+        # Load strategy from registry
+        self.strategy = load_strategy(Config.DEFAULT_STRATEGY)
+        self.strategy_name = self.strategy.__class__.__name__
+        self.logger.info(f"📈 Strategy loaded: {self.strategy_name}")
 
         # AI and notifications (always create AI validator to show warning if not configured)
         self.ai = AISignalValidator(openai_api_key)
@@ -146,21 +140,21 @@ class ForexTradingBot:
                 return pd.DataFrame()
         return df
 
-    def _analyze_with_triple_ema(self, candles: list) -> TripleEMASignal:
-        """Analyze market using Triple EMA strategy."""
-        if not self.triple_ema_strategy:
-            return TripleEMASignal(direction="WAIT", reason="Strategy not initialized")
+    def _analyze_with_strategy(self, candles: list):
+        """Analyze market using configured strategy."""
+        if not self.strategy:
+            return None
 
         df = self._candles_to_dataframe(candles)
         if df.empty:
-            return TripleEMASignal(direction="WAIT", reason="No valid candle data")
+            return None
 
-        signal = self.triple_ema_strategy.analyze(df)
+        signal = self.strategy.generate_signal(df)
 
         self.logger.info(
-            f"Triple EMA Signal: {signal.direction} | "
-            f"Confidence: {signal.confidence:.0%} | "
-            f"Reason: {signal.reason}"
+            f"{self.strategy_name} Signal: {signal.direction} | "
+            f"Confidence: {getattr(signal, 'confidence', 0):.0%} | "
+            f"Reason: {getattr(signal, 'reason', 'N/A')}"
         )
 
         return signal
@@ -214,11 +208,9 @@ class ForexTradingBot:
             )
 
             # ═══════════════════════════════════════════════════════════════
-            # TRIPLE EMA STRATEGY (if enabled)
+            # STRATEGY SIGNAL (from registry)
             # ═══════════════════════════════════════════════════════════════
-            triple_ema_signal = None
-            if self.use_triple_ema:
-                triple_ema_signal = self._analyze_with_triple_ema(candles)
+            strategy_signal = self._analyze_with_strategy(candles)
 
             # Get AI signal (fallback or complementary)
             if self.ai:
@@ -255,28 +247,31 @@ class ForexTradingBot:
             units_to_trade = self.oanda.calculate_units_from_usd(trade_amount, self.instrument) if self.oanda else 0
 
             # ═══════════════════════════════════════════════════════════════
-            # DECISION LOGIC: Triple EMA vs AI
+            # DECISION LOGIC: Strategy from registry
             # ═══════════════════════════════════════════════════════════════
-            if self.use_triple_ema and triple_ema_signal:
-                # Use Triple EMA strategy
+            if strategy_signal and getattr(strategy_signal, 'direction', None) in ['LONG', 'SHORT']:
+                # Use configured strategy
+                signal_direction = strategy_signal.direction
+                signal_confidence = getattr(strategy_signal, 'confidence', 0.7)
+                
                 should_buy = (
-                    triple_ema_signal.direction == 'LONG' and
-                    triple_ema_signal.confidence >= 0.6 and
+                    signal_direction == 'LONG' and
+                    signal_confidence >= 0.6 and
                     available_to_trade >= trade_amount and
                     not has_position
                 )
                 should_short = (
-                    triple_ema_signal.direction == 'SHORT' and
-                    triple_ema_signal.confidence >= 0.6 and
+                    signal_direction == 'SHORT' and
+                    signal_confidence >= 0.6 and
                     available_to_trade >= trade_amount and
                     not has_position
                 )
-                # Use Triple EMA levels for SL/TP
-                strategy_sl = triple_ema_signal.stop_loss
-                strategy_tp = triple_ema_signal.take_profit
-                strategy_entry = triple_ema_signal.entry_price
+                # Use strategy levels for SL/TP
+                strategy_sl = getattr(strategy_signal, 'stop_loss', None)
+                strategy_tp = getattr(strategy_signal, 'take_profit', None)
+                strategy_entry = getattr(strategy_signal, 'entry_price', current_price)
             else:
-                # Use AI signal (original behavior)
+                # Use AI signal (fallback)
                 should_buy = (
                     ai_signal['signal'] == 'BUY' and
                     ai_signal.get('confidence', 0) >= 0.6 and

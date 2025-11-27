@@ -269,6 +269,12 @@ async def get_public_config():
         masked_id = account_id[:8] + "****" + account_id[-4:]
     else:
         masked_id = "****"
+    
+    # Get strategy info
+    from ..services.strategies.registry import STRATEGIES
+    strategy_id = getattr(Config, 'DEFAULT_STRATEGY', 'rsi_ema200')
+    strategy_info = STRATEGIES.get(strategy_id, {})
+    strategy_name = strategy_info.name if strategy_info else strategy_id
 
     return {
         "account": {
@@ -281,6 +287,10 @@ async def get_public_config():
             "leverage": getattr(Config, 'ACCOUNT_LEVERAGE', 50),
             "trade_amount_percent": Config.TRADE_AMOUNT_PERCENT,
             "min_balance_percent": Config.MIN_BALANCE_PERCENT,
+        },
+        "strategy": {
+            "id": strategy_id,
+            "name": strategy_name,
         },
         "risk": {
             "stop_loss_pips": Config.STOP_LOSS_PIPS,

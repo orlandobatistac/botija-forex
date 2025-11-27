@@ -107,12 +107,12 @@ class Backtester:
         """Load strategy from registry."""
         try:
             from .strategies.registry import load_strategy, get_default_strategy_id
-            
+
             if not strategy_id:
                 strategy_id = get_default_strategy_id()
-            
+
             return load_strategy(strategy_id)
-            
+
         except Exception as e:
             self.logger.error(f"Failed to load strategy: {e}")
             return None

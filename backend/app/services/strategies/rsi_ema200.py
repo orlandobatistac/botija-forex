@@ -28,7 +28,7 @@ class RSISignal:
     take_profit: Optional[float] = None
     confidence: float = 0.0
     reason: str = ""
-    
+
     # Metadata
     rsi: Optional[float] = None
     ema_200: Optional[float] = None
@@ -51,7 +51,7 @@ class RSISignal:
 class RSIEMA200Strategy:
     """
     RSI + EMA200 Mean Reversion Strategy.
-    
+
     Simple, robust, good for ranging and trending markets.
     """
 
@@ -99,7 +99,7 @@ class RSIEMA200Strategy:
         delta = df['close'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=self.rsi_period).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=self.rsi_period).mean()
-        
+
         rs = gain / (loss + 0.0001)  # Avoid division by zero
         rsi = 100 - (100 / (1 + rs))
         return rsi
@@ -109,7 +109,7 @@ class RSIEMA200Strategy:
         high_low = df['high'] - df['low']
         high_close = abs(df['high'] - df['close'].shift())
         low_close = abs(df['low'] - df['close'].shift())
-        
+
         true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
         atr = true_range.rolling(window=self.atr_period).mean()
         return atr
@@ -121,7 +121,7 @@ class RSIEMA200Strategy:
     def get_trend_bias(self, price: float, ema_200: float) -> str:
         """Determine trend bias based on EMA 200."""
         buffer = ema_200 * 0.001  # 0.1% buffer
-        
+
         if price > ema_200 + buffer:
             return "BULLISH"
         elif price < ema_200 - buffer:
@@ -224,7 +224,7 @@ class RSIEMA200Strategy:
             confidence = 0.6 + (0.2 * (self.rsi_oversold - rsi) / self.rsi_oversold)
         else:
             confidence = 0.6 + (0.2 * (rsi - self.rsi_overbought) / (100 - self.rsi_overbought))
-        
+
         confidence = min(0.9, max(0.6, confidence))
 
         logger.info(

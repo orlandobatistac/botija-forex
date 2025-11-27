@@ -66,11 +66,11 @@ def get_strategy_list() -> list:
 def load_strategy(strategy_id: str, params: Optional[Dict[str, Any]] = None):
     """
     Load a strategy by ID.
-    
+
     Args:
         strategy_id: Strategy identifier (e.g., 'triple_ema', 'rsi_ema200')
         params: Optional parameters to override defaults
-        
+
     Returns:
         Strategy instance
     """
@@ -78,28 +78,28 @@ def load_strategy(strategy_id: str, params: Optional[Dict[str, Any]] = None):
         logger.error(f"Unknown strategy: {strategy_id}")
         # Default to RSI + EMA200
         strategy_id = "rsi_ema200"
-    
+
     info = STRATEGIES[strategy_id]
-    
+
     # Merge default params with provided params
     final_params = {**info.default_params}
     if params:
         final_params.update(params)
-    
+
     try:
         if strategy_id == "triple_ema":
             from .triple_ema import TripleEMAStrategy
             return TripleEMAStrategy(**final_params)
-        
+
         elif strategy_id == "rsi_ema200":
             from .rsi_ema200 import RSIEMA200Strategy
             return RSIEMA200Strategy(**final_params)
-        
+
         else:
             logger.warning(f"Strategy {strategy_id} not implemented, using RSI+EMA200")
             from .rsi_ema200 import RSIEMA200Strategy
             return RSIEMA200Strategy()
-            
+
     except Exception as e:
         logger.error(f"Failed to load strategy {strategy_id}: {e}")
         from .rsi_ema200 import RSIEMA200Strategy
