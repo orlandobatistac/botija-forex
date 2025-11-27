@@ -240,6 +240,11 @@
                     <td class="px-3 py-2 text-gray-300">
                       <div class="text-xs font-medium" x-text="toETDate(cycle.timestamp)"></div>
                       <div class="text-xs text-gray-500" x-text="toETTime(cycle.timestamp)"></div>
+                      <span
+                        class="px-1.5 py-0.5 rounded text-[10px] font-medium mt-0.5 inline-block"
+                        :class="cycle.trigger === 'manual' ? 'bg-cyan-600/50 text-cyan-200' : 'bg-indigo-600/50 text-indigo-200'"
+                        x-text="cycle.trigger === 'manual' ? '⚡ Manual' : '⏰ Auto'"
+                      ></span>
                     </td>
                     <td class="px-3 py-2">
                       <div class="flex flex-col gap-1">
@@ -654,7 +659,12 @@
           // Convert UTC timestamp to ET (New York timezone)
           toET(timestamp) {
             if (!timestamp) return "";
-            return new Date(timestamp).toLocaleString("en-US", {
+            // Ensure timestamp is treated as UTC if no timezone info
+            let date = new Date(timestamp);
+            if (typeof timestamp === 'string' && !timestamp.includes('Z') && !timestamp.includes('+')) {
+              date = new Date(timestamp + 'Z');
+            }
+            return date.toLocaleString("en-US", {
               timeZone: "America/New_York",
               year: "numeric",
               month: "2-digit",
@@ -668,7 +678,12 @@
 
           toETTime(timestamp) {
             if (!timestamp) return "";
-            return new Date(timestamp).toLocaleTimeString("en-US", {
+            // Ensure timestamp is treated as UTC if no timezone info
+            let date = new Date(timestamp);
+            if (!timestamp.includes('Z') && !timestamp.includes('+')) {
+              date = new Date(timestamp + 'Z');
+            }
+            return date.toLocaleTimeString("en-US", {
               timeZone: "America/New_York",
               hour: "2-digit",
               minute: "2-digit",
@@ -717,7 +732,12 @@
           // Convert UTC timestamp to ET date only
           toETDate(timestamp) {
             if (!timestamp) return "";
-            return new Date(timestamp).toLocaleDateString("en-US", {
+            // Ensure timestamp is treated as UTC if no timezone info
+            let date = new Date(timestamp);
+            if (!timestamp.includes('Z') && !timestamp.includes('+')) {
+              date = new Date(timestamp + 'Z');
+            }
+            return date.toLocaleDateString("en-US", {
               timeZone: "America/New_York",
               month: "short",
               day: "2-digit",
