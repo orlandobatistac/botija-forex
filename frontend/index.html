@@ -151,10 +151,9 @@
               <span
                 class="px-2 py-1 rounded text-xs font-bold"
                 :class="{
-                  'bg-green-600': schedulerStatus.last_cycle_result?.action === 'BOUGHT' || schedulerStatus.last_cycle_result?.action === 'LONGED',
-                  'bg-red-600': schedulerStatus.last_cycle_result?.action === 'SOLD' || schedulerStatus.last_cycle_result?.action === 'SHORTED',
-                  'bg-yellow-600': schedulerStatus.last_cycle_result?.action === 'HOLD',
-                  'bg-gray-600': !schedulerStatus.last_cycle_result?.action
+                  'bg-green-600': schedulerStatus.last_cycle_result?.action === 'BOUGHT' || schedulerStatus.last_cycle_result?.action === 'LONGED' || schedulerStatus.last_cycle_result?.action === 'LONG',
+                  'bg-red-600': schedulerStatus.last_cycle_result?.action === 'SOLD' || schedulerStatus.last_cycle_result?.action === 'SHORTED' || schedulerStatus.last_cycle_result?.action === 'SHORT',
+                  'bg-gray-600': schedulerStatus.last_cycle_result?.action === 'SKIP' || schedulerStatus.last_cycle_result?.action === 'HOLD' || !schedulerStatus.last_cycle_result?.action
                 }"
                 x-text="schedulerStatus.last_cycle_result?.action || 'N/A'"
               ></span>
@@ -263,7 +262,7 @@
                           :class="{
                             'bg-green-600': cycle.ai_signal === 'BUY',
                             'bg-red-600': cycle.ai_signal === 'SELL',
-                            'bg-yellow-600': cycle.ai_signal === 'HOLD'
+                            'bg-gray-600': cycle.ai_signal === 'NEUTRAL' || cycle.ai_signal === 'HOLD'
                           }"
                           x-text="cycle.ai_signal"
                         ></span>
@@ -275,9 +274,9 @@
                       <span
                         class="px-2 py-0.5 rounded text-xs font-bold"
                         :class="{
-                          'bg-green-600': cycle.action === 'BOUGHT' || cycle.action === 'LONGED',
-                          'bg-red-600': cycle.action === 'SOLD' || cycle.action === 'SHORTED',
-                          'bg-yellow-600': cycle.action === 'HOLD',
+                          'bg-green-600': cycle.action === 'BOUGHT' || cycle.action === 'LONGED' || cycle.action === 'LONG',
+                          'bg-red-600': cycle.action === 'SOLD' || cycle.action === 'SHORTED' || cycle.action === 'SHORT',
+                          'bg-gray-600': cycle.action === 'SKIP' || cycle.action === 'HOLD',
                           'bg-red-800': cycle.action === 'ERROR' || (cycle.action && cycle.action.includes('FAILED'))
                         }"
                         x-text="cycle.action"

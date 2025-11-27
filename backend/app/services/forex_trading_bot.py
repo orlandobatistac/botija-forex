@@ -517,7 +517,7 @@ class ForexTradingBot:
             'rsi': 0,
             'balance': 0,
             'position_units': 0,
-            'ai_signal': 'HOLD',
+            'ai_signal': 'NEUTRAL',
             'ai_confidence': 0,
             'ai_reason': None,
             'action': 'ERROR',
@@ -559,7 +559,7 @@ class ForexTradingBot:
                 elif direction == 'SHORT':
                     cycle_data['ai_signal'] = 'SELL'
                 else:
-                    cycle_data['ai_signal'] = 'HOLD'
+                    cycle_data['ai_signal'] = 'NEUTRAL'
                 cycle_data['ai_confidence'] = triple_ema_result.get('confidence', 0)
                 cycle_data['ai_reason'] = triple_ema_result.get('reason', '')
             else:
@@ -647,8 +647,8 @@ class ForexTradingBot:
                     self.risk_manager.record_trade(result.get('pl'))
 
             else:
-                self.logger.info("⏸️ No trading signal - HOLD")
-                cycle_data['action'] = 'HOLD'
+                self.logger.info("⏸️ No trading signal - SKIP")
+                cycle_data['action'] = 'SKIP'
 
             # Save cycle to database
             execution_time = int((time.time() - start_time) * 1000)
