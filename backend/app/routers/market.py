@@ -180,19 +180,15 @@ async def get_all_positions():
 async def run_backtest(
     instrument: str,
     timeframe: str = "H4",
-    candles: int = 500,
-    stop_loss: float = 50.0,
-    take_profit: float = 100.0
+    candles: int = 500
 ):
     """
-    Run a backtest on historical data.
+    Run a backtest on historical data using the currently configured strategy.
 
     Args:
         instrument: Currency pair (EUR_USD, GBP_USD, etc.)
         timeframe: Candle granularity (H1, H4, D)
         candles: Number of candles to test (max 5000)
-        stop_loss: Stop loss in pips
-        take_profit: Take profit in pips
     """
     try:
         oanda = get_oanda_client()
@@ -203,9 +199,7 @@ async def run_backtest(
 
         backtester = Backtester(
             oanda_client=oanda,
-            instrument=instrument,
-            stop_loss_pips=stop_loss,
-            take_profit_pips=take_profit
+            instrument=instrument
         )
 
         result = backtester.run(
@@ -228,7 +222,7 @@ async def run_multi_pair_backtest(
     candles: int = 500
 ):
     """
-    Run backtest on all configured pairs and return summary.
+    Run backtest on all configured pairs using the current strategy.
     """
     try:
         oanda = get_oanda_client()
@@ -240,15 +234,14 @@ async def run_multi_pair_backtest(
         for instrument in Config.TRADING_INSTRUMENTS:
             backtester = Backtester(
                 oanda_client=oanda,
-                instrument=instrument,
-                stop_loss_pips=Config.STOP_LOSS_PIPS,
-                take_profit_pips=Config.TAKE_PROFIT_PIPS
+                instrument=instrument
             )
 
             result = backtester.run(timeframe=timeframe, candle_count=candles)
 
             results.append({
                 "instrument": instrument,
+                "strategy": result.strategy,
                 "total_trades": result.total_trades,
                 "win_rate": result.win_rate,
                 "total_pips": result.total_pips,

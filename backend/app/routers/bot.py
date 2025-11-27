@@ -269,7 +269,7 @@ async def get_public_config():
         masked_id = account_id[:8] + "****" + account_id[-4:]
     else:
         masked_id = "****"
-    
+
     return {
         "account": {
             "account_id": masked_id,
