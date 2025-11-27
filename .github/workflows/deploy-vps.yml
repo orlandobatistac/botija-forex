@@ -22,19 +22,19 @@ jobs:
           script: |
             set -e
             echo "🚀 Starting deployment..."
-            
+
             cd /var/www/botija-forex || exit 1
-            
+
             echo "📦 Pulling latest code..."
             git pull origin main
-            
+
             echo "📦 Installing dependencies..."
             /var/www/botija-forex/venv/bin/pip install -r backend/requirements.txt --quiet
-            
+
             echo "🔄 Restarting bot service..."
             systemctl restart botija-forex
             sleep 3
-            
+
             echo "✅ Verifying service..."
             if systemctl is-active --quiet botija-forex; then
               echo "✅ Deployment successful - botija-forex service is running"
