@@ -75,7 +75,7 @@ def load_strategy(strategy_id: str, params: Optional[Dict[str, Any]] = None):
         Strategy instance
     """
     logger.info(f"Loading strategy: {strategy_id}")
-    
+
     if strategy_id not in STRATEGIES:
         logger.error(f"Unknown strategy: {strategy_id}")
         # Default to RSI + EMA200

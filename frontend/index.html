@@ -1095,7 +1095,7 @@
               };
               const daysPerMonth = 30;
               let candles = this.backtestMonths * daysPerMonth * (candlesPerDay[this.backtestTimeframe] || 6);
-              
+
               // Ensure minimum 300 candles (EMA 200 + buffer)
               candles = Math.max(candles, 300);
               // Cap at OANDA limit

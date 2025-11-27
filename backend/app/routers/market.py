@@ -210,6 +210,8 @@ async def run_backtest(
 
         instrument = instrument.upper().replace("-", "_")
 
+        logger.info(f"Backtest request: strategy={strategy}, instrument={instrument}, timeframe={timeframe}, candles={candles}")
+
         backtester = Backtester(
             oanda_client=oanda,
             instrument=instrument,
