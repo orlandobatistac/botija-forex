@@ -100,20 +100,20 @@
             <div class="text-xs text-gray-500">Available margin</div>
           </div>
 
-          <!-- Position / NAV -->
+          <!-- Total Unrealized P/L -->
           <div
             class="bg-gradient-to-br from-purple-900/30 to-gray-900 rounded-xl border border-purple-700/50 p-6 shadow-lg"
           >
             <div class="flex items-center justify-between mb-3">
-              <div class="text-sm font-medium text-purple-300">Position</div>
-              <span class="text-2xl">📊</span>
+              <div class="text-sm font-medium text-purple-300">Total P/L</div>
+              <span class="text-2xl">📈</span>
             </div>
             <div
               class="text-2xl font-bold mb-1"
-              :class="botStatus.position_units > 0 ? 'text-green-400' : botStatus.position_units < 0 ? 'text-red-400' : 'text-gray-400'"
-              x-text="formatPosition(botStatus.position_units)"
+              :class="totalUnrealizedPL > 0 ? 'text-green-400' : totalUnrealizedPL < 0 ? 'text-red-400' : 'text-gray-400'"
+              x-text="formatUSD(totalUnrealizedPL)"
             ></div>
-            <div class="text-xs text-purple-300/70" x-text="botStatus.unrealized_pl ? 'P/L: ' + formatUSD(botStatus.unrealized_pl) : 'No position'"></div>
+            <div class="text-xs text-purple-300/70" x-text="positions.length + ' open position' + (positions.length !== 1 ? 's' : '')"></div>
           </div>
         </div>
 
@@ -674,6 +674,7 @@
           manualCycleRunning: false,
           lastUpdate: new Date().toISOString(),
           positions: [],
+          totalUnrealizedPL: 0,
 
           // Computed: time since last cycle
           get timeSinceLastCycle() {
@@ -915,6 +916,10 @@
               if (response.ok) {
                 const data = await response.json();
                 this.positions = data.positions || [];
+                // Calculate total unrealized P/L from all positions
+                this.totalUnrealizedPL = this.positions.reduce(
+                  (sum, pos) => sum + (pos.unrealized_pl || 0), 0
+                );
               }
             } catch (err) {
               console.error("Error fetching positions:", err);
