@@ -253,7 +253,7 @@ class ForexTradingBot:
                 # Use configured strategy
                 signal_direction = strategy_signal.direction
                 signal_confidence = getattr(strategy_signal, 'confidence', 0.7)
-                
+
                 should_buy = (
                     signal_direction == 'LONG' and
                     signal_confidence >= 0.6 and

@@ -269,7 +269,7 @@ async def get_public_config():
         masked_id = account_id[:8] + "****" + account_id[-4:]
     else:
         masked_id = "****"
-    
+
     # Get strategy info
     from ..services.strategies.registry import STRATEGIES
     strategy_id = getattr(Config, 'DEFAULT_STRATEGY', 'rsi_ema200')

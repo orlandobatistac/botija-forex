@@ -752,12 +752,13 @@
               </select>
             </div>
             <div>
-              <label class="block text-xs text-gray-400 mb-1">Candles</label>
-              <select x-model="backtestCandles" class="bg-gray-700 rounded px-3 py-2 text-white border border-gray-600">
-                <option value="500">500</option>
-                <option value="1000">1000</option>
-                <option value="2000">2000</option>
-                <option value="5000">5000</option>
+              <label class="block text-xs text-gray-400 mb-1">Period</label>
+              <select x-model="backtestMonths" class="bg-gray-700 rounded px-3 py-2 text-white border border-gray-600">
+                <option value="1">1 month</option>
+                <option value="3">3 months</option>
+                <option value="6">6 months</option>
+                <option value="12">12 months</option>
+                <option value="24">24 months</option>
               </select>
             </div>
             <button
@@ -889,7 +890,7 @@
           backtestRunning: false,
           backtestStrategy: 'rsi_ema200',
           backtestTimeframe: 'H4',
-          backtestCandles: 1000,
+          backtestMonths: 6,
           backtestResult: null,
           botStatus: {
             is_running: false,
@@ -1085,7 +1086,20 @@
             this.backtestRunning = true;
             this.backtestResult = null;
             try {
-              const response = await fetch(`/api/v1/market/backtest/${this.botStatus.instrument}?timeframe=${this.backtestTimeframe}&candles=${this.backtestCandles}&strategy=${this.backtestStrategy}`);
+              // Calculate candles based on months and timeframe
+              const candlesPerDay = {
+                'M15': 96,   // 24h * 4 per hour
+                'H1': 24,    // 24 per day
+                'H4': 6,     // 6 per day
+                'D': 1       // 1 per day
+              };
+              const daysPerMonth = 30;
+              const candles = Math.min(
+                this.backtestMonths * daysPerMonth * (candlesPerDay[this.backtestTimeframe] || 6),
+                5000  // OANDA limit
+              );
+              
+              const response = await fetch(`/api/v1/market/backtest/${this.botStatus.instrument}?timeframe=${this.backtestTimeframe}&candles=${candles}&strategy=${this.backtestStrategy}`);
               if (!response.ok) throw new Error('Backtest failed');
               this.backtestResult = await response.json();
             } catch (error) {
