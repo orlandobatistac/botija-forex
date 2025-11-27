@@ -888,7 +888,7 @@
           strategies: [],
           // Backtest state
           backtestRunning: false,
-          backtestStrategy: 'rsi_ema200',
+          backtestStrategy: '',  // Se inicializa en fetchStrategies()
           backtestTimeframe: 'H4',
           backtestMonths: 6,
           backtestResult: null,
@@ -1068,7 +1068,8 @@
               const response = await fetch('/api/v1/market/strategies');
               if (response.ok) {
                 this.strategies = await response.json();
-                if (this.strategies.length > 0 && !this.backtestStrategy) {
+                // Siempre inicializar con la primera estrategia
+                if (this.strategies.length > 0) {
                   this.backtestStrategy = this.strategies[0].id;
                 }
               }
@@ -1076,9 +1077,10 @@
               console.error('Error fetching strategies:', error);
               // Fallback
               this.strategies = [
-                { id: 'rsi_ema200', name: 'RSI + EMA200' },
-                { id: 'triple_ema', name: 'Triple EMA' }
+                { id: 'triple_ema', name: 'Triple EMA' },
+                { id: 'rsi_ema200', name: 'RSI + EMA200' }
               ];
+              this.backtestStrategy = 'triple_ema';
             }
           },
 
