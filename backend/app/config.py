@@ -32,9 +32,15 @@ class Config:
     TRADING_INSTRUMENTS = os.getenv("TRADING_INSTRUMENTS", "EUR_USD").split(",")
     TRADING_INSTRUMENTS = [i.strip() for i in TRADING_INSTRUMENTS if i.strip()]
 
-    # Position sizing (percentage-based)
-    TRADE_AMOUNT_PERCENT = float(os.getenv("TRADE_AMOUNT_PERCENT", 10))  # % of balance per trade
+    # Account settings
+    ACCOUNT_LEVERAGE = int(os.getenv("ACCOUNT_LEVERAGE", 50))  # e.g., 50 for 50:1
+
+    # Position sizing (percentage-based on margin, not notional)
+    MARGIN_PERCENT = float(os.getenv("MARGIN_PERCENT", 2))  # % of balance to use as margin per trade
     MIN_BALANCE_PERCENT = float(os.getenv("MIN_BALANCE_PERCENT", 20))  # % to keep as reserve
+
+    # Legacy (deprecated, use MARGIN_PERCENT instead)
+    TRADE_AMOUNT_PERCENT = float(os.getenv("TRADE_AMOUNT_PERCENT", 10))
 
     # Risk management (pips)
     STOP_LOSS_PIPS = float(os.getenv("STOP_LOSS_PIPS", 50))

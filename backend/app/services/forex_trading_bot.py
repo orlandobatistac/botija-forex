@@ -108,9 +108,27 @@ class ForexTradingBot:
         self.logger.info("🛡️ Risk Manager attached")
 
     def _calculate_trade_amount(self, balance: float) -> float:
-        """Calculate trade amount based on config"""
+        """
+        Calculate trade amount (notional) based on config.
+        
+        If MARGIN_PERCENT is set, calculates notional from margin using leverage.
+        Example: $100k balance, 2% margin, 50:1 leverage
+                 Margin = $2,000 → Notional = $2,000 * 50 = $100,000
+        """
         if self.trade_amount_usd > 0:
             return self.trade_amount_usd
+        
+        # New: Use margin percent with leverage
+        margin_percent = getattr(Config, 'MARGIN_PERCENT', 0)
+        leverage = getattr(Config, 'ACCOUNT_LEVERAGE', 50)
+        
+        if margin_percent > 0:
+            margin = balance * (margin_percent / 100)
+            notional = margin * leverage
+            self.logger.debug(f"Position sizing: {margin_percent}% margin (${margin:.0f}) × {leverage}:1 = ${notional:.0f} notional")
+            return notional
+        
+        # Legacy: percentage of balance as notional
         return balance * (self.trade_amount_percent / 100)
 
     def _calculate_min_balance(self, balance: float) -> float:
