@@ -428,22 +428,14 @@
             <h2 class="text-xl font-bold flex items-center gap-2">
               <span>💰</span> Recent Trades
             </h2>
-            <div class="flex gap-2">
-              <button
-                @click="syncTrades()"
-                :disabled="syncing"
-                class="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-              >
-                <span x-show="!syncing">🔗 Sync OANDA</span>
-                <span x-show="syncing">⏳ Syncing...</span>
-              </button>
-              <button
-                @click="refreshStatus()"
-                class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-              >
-                🔄 Refresh
-              </button>
-            </div>
+            <button
+              @click="syncTrades(); refreshStatus()"
+              :disabled="syncing"
+              class="bg-green-600 hover:bg-green-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+            >
+              <span x-show="!syncing">🔄 Refresh</span>
+              <span x-show="syncing">⏳ Syncing...</span>
+            </button>
           </div>
           <div x-show="trades.length > 0" class="overflow-x-auto">
             <table class="w-full text-sm">
