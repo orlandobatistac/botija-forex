@@ -479,7 +479,7 @@ class OandaClient:
     def get_closed_trades(self, count: int = 50) -> List[Dict]:
         """
         Get recently closed trades from OANDA
-        
+
         Args:
             count: Number of trades to fetch (max 500)
         """

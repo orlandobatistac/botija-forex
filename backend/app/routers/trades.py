@@ -98,25 +98,25 @@ async def sync_trades_from_oanda(db: Session = Depends(get_db)):
     from ..services.oanda_client import OandaClient
     from ..config import settings
     from datetime import datetime
-    
+
     try:
         oanda = OandaClient(
             api_key=settings.OANDA_API_KEY,
             account_id=settings.OANDA_ACCOUNT_ID,
             environment=settings.OANDA_ENVIRONMENT
         )
-        
+
         closed_trades = oanda.get_closed_trades(count=50)
         synced = 0
-        
+
         for trade in closed_trades:
             trade_id = trade.get("id")
-            
+
             # Check if trade already exists
             existing = db.query(models.Trade).filter(
                 models.Trade.trade_id == trade_id
             ).first()
-            
+
             if existing:
                 # Update if closed but not recorded
                 if existing.status != "CLOSED":
@@ -130,6 +130,8 @@ async def sync_trades_from_oanda(db: Session = Depends(get_db)):
             else:
                 # Create new trade record
                 units = int(trade.get("initialUnits", 0))
+                env = settings.OANDA_ENVIRONMENT.lower()
+                trade_mode = "DEMO" if env in ("demo", "practice") else "LIVE"
                 new_trade = models.Trade(
                     trade_id=trade_id,
                     order_type="BUY" if units > 0 else "SELL",
@@ -139,7 +141,7 @@ async def sync_trades_from_oanda(db: Session = Depends(get_db)):
                     units=abs(units),
                     profit_loss=float(trade.get("realizedPL", 0)),
                     status="CLOSED",
-                    trading_mode="DEMO" if "practice" in settings.OANDA_ENVIRONMENT else "LIVE",
+                    trading_mode=trade_mode,
                     created_at=datetime.fromisoformat(
                         trade.get("openTime", "").replace("Z", "+00:00")
                     ) if trade.get("openTime") else datetime.utcnow(),
@@ -150,14 +152,15 @@ async def sync_trades_from_oanda(db: Session = Depends(get_db)):
                 )
                 db.add(new_trade)
                 synced += 1
-        
+
         db.commit()
-        
+
         return {
             "success": True,
             "synced": synced,
             "total_checked": len(closed_trades)
         }
-        
+
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        import traceback
+        return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
