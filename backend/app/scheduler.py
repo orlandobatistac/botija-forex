@@ -183,13 +183,29 @@ def shutdown_scheduler():
 
 def get_scheduler_status() -> dict:
     """Get scheduler status"""
+    from datetime import datetime, timezone
+
     jobs = scheduler.get_jobs() if scheduler.running else []
+
+    # Calculate seconds until next run
+    seconds_until_next = None
+    next_run_time = None
+    if jobs and jobs[0].next_run_time:
+        next_run_time = jobs[0].next_run_time
+        now = datetime.now(timezone.utc)
+        if next_run_time.tzinfo is None:
+            next_run_time = next_run_time.replace(tzinfo=timezone.utc)
+        seconds_until_next = max(0, (next_run_time - now).total_seconds())
 
     return {
         "running": scheduler.running,
         "jobs": len(jobs),
-        "next_run": str(jobs[0].next_run_time) if jobs else None,
-        "last_cycle": last_cycle_info
+        "next_run": str(next_run_time) if next_run_time else None,
+        "next_run_time": str(next_run_time) if next_run_time else None,
+        "seconds_until_next": seconds_until_next,
+        "last_cycle": last_cycle_info,
+        "last_cycle_result": last_cycle_info,
+        "trading_mode": "DEMO"
     }
 
 

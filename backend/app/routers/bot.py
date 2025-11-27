@@ -46,7 +46,26 @@ async def get_dashboard(db: Session = Depends(get_db)):
     try:
         status = db.query(models.BotStatus).order_by(models.BotStatus.id.desc()).first()
 
+        # Si no hay status, usar último ciclo como fallback
         if not status:
+            last_cycle = db.query(models.TradingCycle).order_by(
+                models.TradingCycle.timestamp.desc()
+            ).first()
+
+            if last_cycle:
+                return schemas.DashboardResponse(
+                    mode=last_cycle.trading_mode,
+                    instrument=last_cycle.instrument,
+                    balance=last_cycle.balance,
+                    nav=last_cycle.balance,
+                    position_units=last_cycle.position_units,
+                    unrealized_pl=0.0,
+                    is_running=False,
+                    last_price=last_cycle.price,
+                    spread_pips=last_cycle.spread_pips,
+                    status="from_cycle"
+                )
+
             return schemas.DashboardResponse(
                 mode=Config.TRADING_MODE,
                 instrument=Config.DEFAULT_INSTRUMENT,
@@ -126,3 +145,23 @@ async def get_logs(limit: int = 100, level: str = None):
     handler = get_log_handler()
     logs = handler.get_logs(limit=limit, level=level)
     return {"logs": logs, "count": len(logs)}
+
+
+@router.get("/logs/download")
+async def download_logs():
+    """Download logs as a file"""
+    from fastapi.responses import PlainTextResponse
+    handler = get_log_handler()
+    logs = handler.get_logs(limit=1000)
+
+    # Format logs as text
+    log_text = "\n".join([
+        f"{log.get('timestamp', '')} [{log.get('level', '')}] {log.get('message', '')}"
+        for log in logs
+    ])
+
+    return PlainTextResponse(
+        content=log_text,
+        media_type="text/plain",
+        headers={"Content-Disposition": "attachment; filename=botija-forex.log"}
+    )

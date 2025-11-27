@@ -1,164 +1,844 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Botija Forex</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Botija Forex AI Trading Bot</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='75'>⚡</text></svg>"
+      type="image/svg+xml"
+    />
+    <script
+      src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"
+      defer
+    ></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-</head>
-<body class="bg-gray-900 text-white min-h-screen">
-    <div x-data="dashboard()" x-init="init()">
-        <!-- Header -->
-        <header class="bg-gray-800 shadow-lg">
-            <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-                <h1 class="text-2xl font-bold text-green-400">📊 Botija Forex</h1>
-                <div class="flex items-center gap-4">
-                    <span class="px-3 py-1 rounded-full text-sm"
-                          :class="status.mode === 'DEMO' ? 'bg-yellow-600' : 'bg-green-600'"
-                          x-text="status.mode">
-                    </span>
-                    <span class="text-gray-400" x-text="status.instrument"></span>
-                </div>
+    <link rel="stylesheet" href="/static/css/components.css" />
+  </head>
+
+  <body
+    class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen text-gray-100"
+  >
+    <div x-data="app()" x-init="init()" class="min-h-screen flex flex-col">
+      <!-- Header/Navigation -->
+      <nav class="bg-gray-950 border-b border-gray-700">
+        <div
+          class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center"
+        >
+          <div class="flex items-center gap-2">
+            <span class="text-2xl font-bold text-green-500">⚡</span>
+            <h1 class="text-xl font-bold">Botija Forex AI Trading Bot</h1>
+          </div>
+          <div class="flex items-center gap-6">
+            <div x-show="!loading && status" class="flex items-center gap-2">
+              <span
+                class="inline-block w-3 h-3 bg-green-500 rounded-full animate-pulse"
+              ></span>
+              <span class="text-sm text-green-400">Connected</span>
             </div>
-        </header>
+            <div x-show="loading" class="text-blue-400 text-sm">Loading...</div>
+            <div class="text-xs text-gray-500">
+              Next trading cycle in:
+              <span x-text="formatTime(schedulerCountdown)"></span>
+            </div>
+          </div>
+        </div>
+      </nav>
 
-        <!-- Main Content -->
-        <main class="max-w-7xl mx-auto px-4 py-8">
-            <!-- Status Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <!-- Balance -->
-                <div class="bg-gray-800 rounded-lg p-6">
-                    <div class="text-gray-400 text-sm mb-1">Balance</div>
-                    <div class="text-2xl font-bold" x-text="'$' + status.balance.toFixed(2)"></div>
-                </div>
+      <!-- Main Content -->
+      <main class="flex-1 max-w-7xl mx-auto w-full px-4 py-8">
+        <!-- Top KPIs - Bot Status & Portfolio -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <!-- Bot Status -->
+          <div
+            class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl border border-gray-700 p-6 shadow-lg"
+          >
+            <div class="flex items-center justify-between mb-3">
+              <div class="text-sm font-medium text-gray-400">Bot Status</div>
+              <span
+                class="inline-block w-3 h-3 bg-green-500 rounded-full animate-pulse"
+              ></span>
+            </div>
+            <div
+              class="text-3xl font-bold text-green-400 mb-1"
+              x-text="botStatus.is_running ? 'ACTIVE' : 'INACTIVE'"
+            ></div>
+            <div class="text-xs text-gray-500">
+              <span x-text="schedulerStatus.trading_mode || 'DEMO'"></span>
+              mode
+            </div>
+          </div>
 
-                <!-- NAV -->
-                <div class="bg-gray-800 rounded-lg p-6">
-                    <div class="text-gray-400 text-sm mb-1">NAV</div>
-                    <div class="text-2xl font-bold" x-text="'$' + status.nav.toFixed(2)"></div>
-                </div>
+          <!-- Current Instrument -->
+          <div
+            class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl border border-gray-700 p-6 shadow-lg"
+          >
+            <div class="flex items-center justify-between mb-3">
+              <div class="text-sm font-medium text-gray-400">Instrument</div>
+              <span class="text-2xl">💱</span>
+            </div>
+            <div
+              class="text-2xl font-bold text-orange-400 mb-1"
+              x-text="botStatus.instrument || 'EUR_USD'"
+            ></div>
+            <div class="text-xs text-gray-500">Current pair</div>
+          </div>
 
-                <!-- Position -->
-                <div class="bg-gray-800 rounded-lg p-6">
-                    <div class="text-gray-400 text-sm mb-1">Position</div>
-                    <div class="text-2xl font-bold"
-                         :class="status.position_units > 0 ? 'text-green-400' : status.position_units < 0 ? 'text-red-400' : 'text-gray-400'"
-                         x-text="status.position_units + ' units'">
-                    </div>
-                </div>
+          <!-- Account Balance -->
+          <div
+            class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl border border-gray-700 p-6 shadow-lg"
+          >
+            <div class="flex items-center justify-between mb-3">
+              <div class="text-sm font-medium text-gray-400">Balance</div>
+              <span class="text-2xl">💵</span>
+            </div>
+            <div
+              class="text-2xl font-bold text-blue-400 mb-1"
+              x-text="formatUSD(botStatus.balance)"
+            ></div>
+            <div class="text-xs text-gray-500">Available margin</div>
+          </div>
 
-                <!-- Unrealized P/L -->
-                <div class="bg-gray-800 rounded-lg p-6">
-                    <div class="text-gray-400 text-sm mb-1">Unrealized P/L</div>
-                    <div class="text-2xl font-bold"
-                         :class="status.unrealized_pl >= 0 ? 'text-green-400' : 'text-red-400'"
-                         x-text="'$' + status.unrealized_pl.toFixed(2)">
-                    </div>
-                </div>
+          <!-- Position / NAV -->
+          <div
+            class="bg-gradient-to-br from-purple-900/30 to-gray-900 rounded-xl border border-purple-700/50 p-6 shadow-lg"
+          >
+            <div class="flex items-center justify-between mb-3">
+              <div class="text-sm font-medium text-purple-300">Position</div>
+              <span class="text-2xl">📊</span>
+            </div>
+            <div
+              class="text-2xl font-bold mb-1"
+              :class="botStatus.position_units > 0 ? 'text-green-400' : botStatus.position_units < 0 ? 'text-red-400' : 'text-gray-400'"
+              x-text="formatPosition(botStatus.position_units)"
+            ></div>
+            <div class="text-xs text-purple-300/70" x-text="botStatus.unrealized_pl ? 'P/L: ' + formatUSD(botStatus.unrealized_pl) : 'No position'"></div>
+          </div>
+        </div>
+
+        <!-- Next Cycle & Manual Control -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          <!-- Next Cycle Countdown -->
+          <div
+            class="bg-gradient-to-br from-blue-900/30 to-gray-900 rounded-xl border border-blue-700/50 p-6 shadow-lg"
+          >
+            <div class="text-sm font-medium text-blue-300 mb-3">
+              ⏰ Next Trading Cycle
+            </div>
+            <div
+              class="text-4xl font-bold text-blue-400 mb-2"
+              x-text="formatTime(schedulerCountdown)"
+            ></div>
+            <div
+              class="text-xs text-blue-300/70"
+              x-text="schedulerStatus.next_run_time ? toET(schedulerStatus.next_run_time) : 'Not scheduled'"
+            ></div>
+          </div>
+
+          <!-- Last Cycle Info -->
+          <div
+            class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl border border-gray-700 p-6 shadow-lg"
+          >
+            <div class="text-sm font-medium text-gray-400 mb-3">
+              📋 Last Cycle
+            </div>
+            <div class="flex items-center gap-3 mb-2">
+              <span
+                class="px-2 py-1 rounded text-xs font-bold"
+                :class="{
+                  'bg-green-600': schedulerStatus.last_cycle_result?.action === 'BOUGHT' || schedulerStatus.last_cycle_result?.action === 'LONGED',
+                  'bg-red-600': schedulerStatus.last_cycle_result?.action === 'SOLD' || schedulerStatus.last_cycle_result?.action === 'SHORTED',
+                  'bg-yellow-600': schedulerStatus.last_cycle_result?.action === 'HOLD',
+                  'bg-gray-600': !schedulerStatus.last_cycle_result?.action
+                }"
+                x-text="schedulerStatus.last_cycle_result?.action || 'N/A'"
+              ></span>
+              <span
+                class="px-2 py-1 rounded text-xs font-semibold"
+                :class="schedulerStatus.last_cycle_result?.trigger === 'manual' ? 'bg-cyan-600' : 'bg-indigo-600'"
+                x-text="schedulerStatus.last_cycle_result?.trigger || 'scheduled'"
+              ></span>
+            </div>
+            <div class="text-xs text-gray-500" x-text="timeSinceLastCycle"></div>
+          </div>
+
+          <!-- Manual Control -->
+          <div
+            class="bg-gradient-to-br from-green-900/30 to-gray-900 rounded-xl border border-green-700/50 p-6 shadow-lg flex flex-col justify-center"
+          >
+            <button
+              @click="runManualCycle()"
+              :disabled="manualCycleRunning"
+              :class="manualCycleRunning ? 'bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'"
+              class="w-full px-6 py-3 rounded-lg font-bold transition-colors flex items-center justify-center gap-2"
+            >
+              <span x-show="!manualCycleRunning" class="text-lg">▶️ Run Manual Cycle</span>
+              <span x-show="manualCycleRunning" class="flex items-center gap-2">
+                <svg
+                  class="animate-spin h-5 w-5"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                  ></circle>
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                Running...
+              </span>
+            </button>
+            <div class="text-xs text-center text-green-300/70 mt-2">
+              Execute cycle immediately
+            </div>
+          </div>
+        </div>
+
+        <!-- Trading Cycles History -->
+        <div
+          class="bg-gray-800 rounded-xl border border-gray-700 p-6 mb-6 shadow-lg"
+        >
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold flex items-center gap-2">
+              <span>📊</span> Trading Cycles History
+            </h2>
+            <button
+              @click="fetchCycles()"
+              class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+            >
+              🔄 Refresh
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-700/50 border-b border-gray-600">
+                <tr>
+                  <th class="px-4 py-3 text-left">Time</th>
+                  <th class="px-4 py-3 text-left">Price</th>
+                  <th class="px-4 py-3 text-left">Indicators</th>
+                  <th class="px-4 py-3 text-left">AI Signal</th>
+                  <th class="px-4 py-3 text-left">Action</th>
+                  <th class="px-4 py-3 text-left">Balance</th>
+                  <th class="px-4 py-3 text-left">Mode</th>
+                  <th class="px-4 py-3 text-right">Time (ms)</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-700">
+                <template x-for="cycle in paginatedCycles" :key="cycle.id">
+                  <tr class="hover:bg-gray-700/30 transition-colors">
+                    <td class="px-4 py-3 text-gray-300">
+                      <div class="text-xs" x-text="toET(cycle.timestamp)"></div>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div
+                        class="font-semibold text-orange-400"
+                        x-text="formatPrice(cycle.price)"
+                      ></div>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div class="text-xs space-y-1">
+                        <div>
+                          <span class="text-gray-500">EMA20:</span>
+                          <span class="text-blue-400" x-text="formatPrice(cycle.ema_fast)"></span>
+                        </div>
+                        <div>
+                          <span class="text-gray-500">EMA50:</span>
+                          <span class="text-purple-400" x-text="formatPrice(cycle.ema_slow)"></span>
+                        </div>
+                        <div>
+                          <span class="text-gray-500">RSI:</span>
+                          <span
+                            :class="cycle.rsi > 70 ? 'text-red-400' : cycle.rsi < 30 ? 'text-green-400' : 'text-gray-300'"
+                            x-text="cycle.rsi?.toFixed(1)"
+                          ></span>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div class="flex items-center gap-2">
+                        <span
+                          class="px-2 py-1 rounded text-xs font-bold"
+                          :class="{
+                            'bg-green-600': cycle.ai_signal === 'BUY',
+                            'bg-red-600': cycle.ai_signal === 'SELL',
+                            'bg-yellow-600': cycle.ai_signal === 'HOLD'
+                          }"
+                          x-text="cycle.ai_signal"
+                        ></span>
+                        <span
+                          class="text-xs text-gray-400"
+                          x-text="(cycle.ai_confidence * 100).toFixed(0) + '%'"
+                        ></span>
+                      </div>
+                      <div
+                        class="text-xs text-gray-500 mt-1 max-w-xs truncate cursor-help"
+                        x-text="cycle.ai_reason"
+                        x-show="cycle.ai_reason"
+                        :title="cycle.ai_reason"
+                      ></div>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span
+                        class="px-2 py-1 rounded text-xs font-bold"
+                        :class="{
+                          'bg-green-600': cycle.action === 'BOUGHT' || cycle.action === 'LONGED',
+                          'bg-red-600': cycle.action === 'SOLD' || cycle.action === 'SHORTED',
+                          'bg-yellow-600': cycle.action === 'HOLD',
+                          'bg-red-800': cycle.action === 'ERROR' || (cycle.action && cycle.action.includes('FAILED'))
+                        }"
+                        x-text="cycle.action"
+                      >
+                      </span>
+                      <div
+                        class="text-xs text-gray-500 mt-1"
+                        x-text="cycle.trade_id"
+                        x-show="cycle.trade_id"
+                      ></div>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div class="text-xs space-y-1">
+                        <div>
+                          <span class="text-blue-400" x-text="formatUSD(cycle.balance)"></span>
+                        </div>
+                        <div>
+                          <span class="text-gray-400" x-text="formatPosition(cycle.position_units)"></span>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div class="flex flex-col gap-1">
+                        <span
+                          class="px-2 py-1 rounded text-xs font-semibold"
+                          :class="cycle.trading_mode === 'DEMO' ? 'bg-blue-600' : 'bg-purple-600'"
+                          x-text="cycle.trading_mode"
+                        >
+                        </span>
+                        <span
+                          x-show="cycle.trigger"
+                          class="px-2 py-1 rounded text-xs font-semibold"
+                          :class="cycle.trigger === 'manual' ? 'bg-cyan-600' : 'bg-indigo-600'"
+                          x-text="cycle.trigger"
+                        >
+                        </span>
+                      </div>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                      <span
+                        class="text-xs text-gray-400"
+                        x-text="cycle.execution_time_ms + 'ms'"
+                      ></span>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+            <div
+              x-show="cycles.length === 0"
+              class="text-gray-500 text-center py-8"
+            >
+              No trading cycles recorded yet
             </div>
 
-            <!-- Controls -->
-            <div class="bg-gray-800 rounded-lg p-6 mb-8">
-                <div class="flex gap-4">
-                    <button @click="runCycle()"
-                            class="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg font-medium">
-                        ▶️ Run Cycle
-                    </button>
-                    <button @click="refreshData()"
-                            class="bg-gray-600 hover:bg-gray-700 px-6 py-2 rounded-lg font-medium">
-                        🔄 Refresh
-                    </button>
+            <!-- Pagination Controls -->
+            <div
+              x-show="cycles.length > 0"
+              class="mt-6 flex items-center justify-between border-t border-gray-700 pt-4"
+            >
+              <div class="text-sm text-gray-400">
+                Showing <span x-text="((cyclesCurrentPage - 1) * cyclesItemsPerPage) + 1"></span>
+                to <span x-text="Math.min(cyclesCurrentPage * cyclesItemsPerPage, cycles.length)"></span>
+                of <span x-text="cycles.length"></span> cycles
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  @click="cyclesPrevPage()"
+                  :disabled="cyclesCurrentPage === 1"
+                  :class="cyclesCurrentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'"
+                  class="px-4 py-2 bg-gray-700 rounded-lg text-sm font-semibold transition-colors"
+                >
+                  ← Previous
+                </button>
+                <div class="text-sm text-gray-400">
+                  Page <span x-text="cyclesCurrentPage"></span> of <span x-text="cyclesTotalPages"></span>
                 </div>
+                <button
+                  @click="cyclesNextPage()"
+                  :disabled="cyclesCurrentPage === cyclesTotalPages"
+                  :class="cyclesCurrentPage === cyclesTotalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'"
+                  class="px-4 py-2 bg-gray-700 rounded-lg text-sm font-semibold transition-colors"
+                >
+                  Next →
+                </button>
+              </div>
             </div>
+          </div>
+        </div>
 
-            <!-- Recent Cycles -->
-            <div class="bg-gray-800 rounded-lg p-6">
-                <h2 class="text-xl font-bold mb-4">Recent Cycles</h2>
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead>
-                            <tr class="text-gray-400 text-left">
-                                <th class="pb-3">Time</th>
-                                <th class="pb-3">Instrument</th>
-                                <th class="pb-3">Price</th>
-                                <th class="pb-3">Signal</th>
-                                <th class="pb-3">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <template x-for="cycle in cycles" :key="cycle.id">
-                                <tr class="border-t border-gray-700">
-                                    <td class="py-3" x-text="formatTime(cycle.timestamp)"></td>
-                                    <td class="py-3" x-text="cycle.instrument"></td>
-                                    <td class="py-3" x-text="cycle.price.toFixed(5)"></td>
-                                    <td class="py-3">
-                                        <span class="px-2 py-1 rounded text-sm"
-                                              :class="{
-                                                  'bg-green-600': cycle.ai_signal === 'BUY',
-                                                  'bg-red-600': cycle.ai_signal === 'SELL',
-                                                  'bg-gray-600': cycle.ai_signal === 'HOLD'
-                                              }"
-                                              x-text="cycle.ai_signal">
-                                        </span>
-                                    </td>
-                                    <td class="py-3" x-text="cycle.action"></td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                </div>
+        <!-- Recent Trades -->
+        <div
+          class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl border border-orange-700/50 p-6 mb-6 shadow-lg"
+        >
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold flex items-center gap-2">
+              <span>💰</span> Recent Trades
+            </h2>
+            <button
+              @click="refreshStatus()"
+              class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+            >
+              🔄 Refresh
+            </button>
+          </div>
+          <div x-show="trades.length > 0" class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-700/50 border-b border-gray-600">
+                <tr>
+                  <th class="px-4 py-3 text-left">Trade ID</th>
+                  <th class="px-4 py-3 text-left">Type</th>
+                  <th class="px-4 py-3 text-left">Entry Price</th>
+                  <th class="px-4 py-3 text-left">Exit Price</th>
+                  <th class="px-4 py-3 text-left">Units</th>
+                  <th class="px-4 py-3 text-left">P/L</th>
+                  <th class="px-4 py-3 text-left">Status</th>
+                  <th class="px-4 py-3 text-left">Date</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-700">
+                <template
+                  x-for="(trade, index) in trades"
+                  :key="'trade-' + index"
+                >
+                  <tr class="hover:bg-gray-700/30 transition-colors">
+                    <td
+                      class="px-4 py-3 font-mono text-xs text-gray-400"
+                      x-text="trade.trade_id"
+                    ></td>
+                    <td class="px-4 py-3">
+                      <span
+                        :class="trade.order_type === 'BUY' ? 'bg-green-600' : 'bg-red-600'"
+                        class="px-2 py-1 rounded text-xs font-bold"
+                        x-text="trade.order_type"
+                      >
+                      </span>
+                    </td>
+                    <td
+                      class="px-4 py-3 text-green-400 font-semibold"
+                      x-text="trade.entry_price ? formatPrice(trade.entry_price) : 'N/A'"
+                    ></td>
+                    <td
+                      class="px-4 py-3 text-blue-400 font-semibold"
+                      x-text="trade.exit_price ? formatPrice(trade.exit_price) : '-'"
+                    ></td>
+                    <td
+                      class="px-4 py-3 font-mono text-xs"
+                      x-text="trade.units ? formatNumber(Math.abs(trade.units), 0) + ' units' : 'N/A'"
+                    ></td>
+                    <td class="px-4 py-3">
+                      <span
+                        :class="trade.profit_loss > 0 ? 'text-green-400' : trade.profit_loss < 0 ? 'text-red-400' : 'text-gray-400'"
+                        class="font-bold"
+                        x-text="trade.profit_loss ? formatUSD(trade.profit_loss) : '-'"
+                      >
+                      </span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span
+                        :class="{
+                          'bg-green-600': trade.status === 'CLOSED',
+                          'bg-blue-600': trade.status === 'OPEN',
+                          'bg-gray-600': trade.status === 'CANCELLED'
+                        }"
+                        class="px-2 py-1 rounded text-xs font-semibold"
+                        x-text="trade.status"
+                      >
+                      </span>
+                    </td>
+                    <td
+                      class="px-4 py-3 text-xs text-gray-400"
+                      x-text="toET(trade.created_at)"
+                    ></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div
+            x-show="trades.length === 0"
+            class="text-gray-500 text-center py-12"
+          >
+            <div class="text-4xl mb-3">📊</div>
+            <div class="text-lg">No trades executed yet</div>
+            <div class="text-sm mt-2">Waiting for trading signals...</div>
+          </div>
+        </div>
+
+        <!-- Application Logs -->
+        <div
+          class="bg-gray-800 rounded-xl border border-gray-700 p-6 shadow-lg"
+        >
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold flex items-center gap-2">
+              <span>📝</span> Application Logs
+            </h2>
+            <div class="flex gap-2">
+              <select
+                x-model="logLevel"
+                @change="fetchLogs()"
+                class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">All Levels</option>
+                <option value="INFO">INFO</option>
+                <option value="WARNING">WARNING</option>
+                <option value="ERROR">ERROR</option>
+              </select>
+              <button
+                @click="fetchLogs()"
+                class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+              >
+                🔄 Refresh
+              </button>
+              <a
+                href="/api/v1/bot/logs/download"
+                download="botija-forex.log"
+                class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors inline-block"
+              >
+                📥 Download
+              </a>
             </div>
-        </main>
+          </div>
+          <div
+            class="bg-gray-900 rounded-lg p-4 font-mono text-xs max-h-96 overflow-y-auto border border-gray-700"
+            id="logs-container"
+          >
+            <template x-for="(log, index) in logs" :key="index">
+              <div
+                class="py-1 border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
+              >
+                <span
+                  class="text-gray-500"
+                  x-text="toETTime(log.timestamp)"
+                ></span>
+                <span
+                  :class="{
+                    'text-blue-400': log.level === 'INFO',
+                    'text-yellow-400': log.level === 'WARNING',
+                    'text-red-400': log.level === 'ERROR',
+                    'text-gray-400': !['INFO', 'WARNING', 'ERROR'].includes(log.level)
+                  }"
+                  x-text="'[' + log.level + ']'"
+                ></span>
+                <span class="text-gray-300" x-text="log.message"></span>
+              </div>
+            </template>
+            <div
+              x-show="logs.length === 0"
+              class="text-gray-500 text-center py-8"
+            >
+              No logs available
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Footer -->
+      <footer class="border-t border-gray-700 bg-gray-950 mt-8">
+        <div
+          class="max-w-7xl mx-auto px-4 py-4 text-center text-sm text-gray-500"
+        >
+          Botija Forex AI Trading Bot v1.0.0 | Last update:
+          <span x-text="toETTime(lastUpdate)"></span>
+        </div>
+      </footer>
     </div>
 
     <script>
-        function dashboard() {
-            return {
-                status: {
-                    mode: 'DEMO',
-                    instrument: 'EUR_USD',
-                    balance: 0,
-                    nav: 0,
-                    position_units: 0,
-                    unrealized_pl: 0,
-                    is_running: false
-                },
-                cycles: [],
+      function app() {
+        return {
+          loading: true,
+          status: null,
+          schedulerCountdown: 0,
+          lastServerSync: Date.now(),
+          botStatus: {
+            is_running: false,
+            balance: 0,
+            nav: 0,
+            position_units: 0,
+            unrealized_pl: 0,
+            instrument: 'EUR_USD'
+          },
+          trades: [],
+          cycles: [],
+          cyclesCurrentPage: 1,
+          cyclesItemsPerPage: 10,
+          schedulerStatus: {
+            running: false,
+            seconds_until_next: 0,
+            next_run_time: null,
+            last_cycle_result: null,
+            trading_mode: 'DEMO'
+          },
+          logs: [],
+          logLevel: '',
+          manualCycleRunning: false,
+          lastUpdate: new Date().toISOString(),
 
-                async init() {
-                    await this.refreshData();
-                    // Auto-refresh every 30 seconds
-                    setInterval(() => this.refreshData(), 30000);
-                },
-
-                async refreshData() {
-                    try {
-                        const dashRes = await fetch('/api/v1/bot/dashboard');
-                        this.status = await dashRes.json();
-
-                        const cyclesRes = await fetch('/api/v1/cycles?limit=10');
-                        this.cycles = await cyclesRes.json();
-                    } catch (e) {
-                        console.error('Error fetching data:', e);
-                    }
-                },
-
-                async runCycle() {
-                    try {
-                        await fetch('/api/v1/bot/cycle', { method: 'POST' });
-                        await this.refreshData();
-                    } catch (e) {
-                        console.error('Error running cycle:', e);
-                    }
-                },
-
-                formatTime(timestamp) {
-                    if (!timestamp) return '-';
-                    return new Date(timestamp).toLocaleString();
-                }
+          // Computed: time since last cycle
+          get timeSinceLastCycle() {
+            if (!this.schedulerStatus.last_cycle_result?.timestamp) {
+              return 'No cycles yet';
             }
-        }
+            const lastTime = new Date(this.schedulerStatus.last_cycle_result.timestamp);
+            const now = new Date();
+            const diff = Math.floor((now - lastTime) / 1000);
+
+            if (diff < 60) return `${diff}s ago`;
+            if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+            if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+            return `${Math.floor(diff / 86400)}d ago`;
+          },
+
+          // Format seconds to HH:MM:SS or Xh Xm Xs
+          formatTime(seconds) {
+            if (seconds <= 0) return "00:00:00";
+
+            const hours = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+
+            return `${hours}h ${mins}m ${secs}s`;
+          },
+
+          // Convert UTC timestamp to ET (New York timezone)
+          toET(timestamp) {
+            if (!timestamp) return "";
+            return new Date(timestamp).toLocaleString("en-US", {
+              timeZone: "America/New_York",
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              hour12: true,
+            });
+          },
+
+          toETTime(timestamp) {
+            if (!timestamp) return "";
+            return new Date(timestamp).toLocaleTimeString("en-US", {
+              timeZone: "America/New_York",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              hour12: true,
+            });
+          },
+
+          // Format number with commas
+          formatNumber(num, decimals = 2) {
+            if (num == null || isNaN(num)) return "0";
+            return parseFloat(num).toLocaleString("en-US", {
+              minimumFractionDigits: decimals,
+              maximumFractionDigits: decimals,
+            });
+          },
+
+          // Format USD currency
+          formatUSD(amount) {
+            if (amount == null || isNaN(amount)) return "$0.00";
+            return "$" + this.formatNumber(amount, 2);
+          },
+
+          // Format forex price (5 decimals)
+          formatPrice(price) {
+            if (price == null || isNaN(price)) return "0.00000";
+            return parseFloat(price).toFixed(5);
+          },
+
+          // Format position units
+          formatPosition(units) {
+            if (units == null || units === 0) return "FLAT";
+            const sign = units > 0 ? "LONG " : "SHORT ";
+            return sign + this.formatNumber(Math.abs(units), 0) + " units";
+          },
+
+          // Pagination for cycles
+          get paginatedCycles() {
+            const start = (this.cyclesCurrentPage - 1) * this.cyclesItemsPerPage;
+            const end = start + this.cyclesItemsPerPage;
+            return this.cycles.slice(start, end);
+          },
+
+          get cyclesTotalPages() {
+            return Math.ceil(this.cycles.length / this.cyclesItemsPerPage) || 1;
+          },
+
+          cyclesNextPage() {
+            if (this.cyclesCurrentPage < this.cyclesTotalPages) {
+              this.cyclesCurrentPage++;
+            }
+          },
+
+          cyclesPrevPage() {
+            if (this.cyclesCurrentPage > 1) {
+              this.cyclesCurrentPage--;
+            }
+          },
+
+          async init() {
+            await this.refreshStatus();
+            await this.fetchLogs();
+            await this.fetchCycles();
+
+            // Refresh status every 10 seconds
+            setInterval(() => this.refreshStatus(), 10000);
+
+            // Refresh cycles every 10 seconds
+            setInterval(() => this.fetchCycles(), 10000);
+
+            // Local countdown decrement every second
+            setInterval(() => {
+              if (this.schedulerCountdown > 0) {
+                this.schedulerCountdown--;
+              }
+            }, 1000);
+          },
+
+          async refreshStatus() {
+            try {
+              // 1. Fetch scheduler status
+              const schedulerResp = await fetch("/api/v1/bot/scheduler");
+              if (schedulerResp.ok) {
+                const schedData = await schedulerResp.json();
+                this.schedulerStatus = schedData;
+
+                // Sync countdown from server
+                if (schedData.seconds_until_next != null) {
+                  const serverSeconds = Math.max(0, Math.floor(schedData.seconds_until_next));
+                  const diff = Math.abs(this.schedulerCountdown - serverSeconds);
+
+                  // Only sync if drift > 5 seconds
+                  if (diff > 5 || this.schedulerCountdown === 0) {
+                    this.schedulerCountdown = serverSeconds;
+                  }
+                  this.lastServerSync = Date.now();
+                }
+              }
+
+              // 2. Fetch dashboard status
+              const dashResp = await fetch("/api/v1/bot/dashboard");
+              if (dashResp.ok) {
+                const dashboard = await dashResp.json();
+                this.botStatus = {
+                  is_running: dashboard.is_running || dashboard.status !== 'not_initialized',
+                  balance: parseFloat(dashboard.balance) || 0,
+                  nav: parseFloat(dashboard.nav) || 0,
+                  position_units: parseInt(dashboard.position_units) || 0,
+                  unrealized_pl: parseFloat(dashboard.unrealized_pl) || 0,
+                  instrument: dashboard.instrument || 'EUR_USD'
+                };
+                this.status = dashboard;
+
+                // 3. Fetch trades
+                try {
+                  const mode = dashboard.mode || "DEMO";
+                  const tradesResp = await fetch(`/api/v1/trades?mode=${mode}&limit=50`);
+                  if (tradesResp.ok) {
+                    const tradesData = await tradesResp.json();
+                    this.trades = Array.isArray(tradesData) ? tradesData : [];
+                  }
+                } catch (e) {
+                  console.warn("Error fetching trades:", e);
+                }
+              }
+
+              this.lastUpdate = new Date().toISOString();
+              this.loading = false;
+            } catch (err) {
+              console.error("Error in refreshStatus:", err);
+              this.loading = false;
+            }
+          },
+
+          async runManualCycle() {
+            if (this.manualCycleRunning) return;
+
+            this.manualCycleRunning = true;
+            try {
+              const response = await fetch("/api/v1/bot/cycle", {
+                method: "POST",
+              });
+              const result = await response.json();
+
+              if (result.success || result.message) {
+                console.log("✅ Manual cycle completed:", result);
+                await this.refreshStatus();
+                await this.fetchCycles();
+              } else {
+                console.error("❌ Manual cycle failed:", result);
+              }
+            } catch (err) {
+              console.error("Error running manual cycle:", err);
+            } finally {
+              this.manualCycleRunning = false;
+            }
+          },
+
+          async fetchCycles() {
+            try {
+              const response = await fetch("/api/v1/cycles/?limit=100");
+              if (response.ok) {
+                const data = await response.json();
+                this.cycles = Array.isArray(data) ? data : [];
+              }
+            } catch (err) {
+              console.error("Error fetching cycles:", err);
+            }
+          },
+
+          async fetchLogs() {
+            try {
+              const url = this.logLevel
+                ? `/api/v1/bot/logs?limit=100&level=${this.logLevel}`
+                : "/api/v1/bot/logs?limit=100";
+
+              const response = await fetch(url);
+              if (response.ok) {
+                const data = await response.json();
+                this.logs = data.logs || [];
+
+                // Auto-scroll to bottom
+                setTimeout(() => {
+                  const container = document.getElementById("logs-container");
+                  if (container) {
+                    container.scrollTop = container.scrollHeight;
+                  }
+                }, 100);
+              }
+            } catch (err) {
+              console.error("Error fetching logs:", err);
+            }
+          },
+        };
+      }
     </script>
-</body>
+
+    <!-- Component Scripts -->
+    <script src="./stores/auth.js"></script>
+    <script src="./stores/app.js"></script>
+    <script src="./utils/api.js"></script>
+    <script src="./components/ui/toast.js"></script>
+    <script src="./components/ui/modal.js"></script>
+    <script src="./components/navigation/navbar.js"></script>
+  </body>
 </html>
