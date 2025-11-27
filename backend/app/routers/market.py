@@ -176,19 +176,32 @@ async def get_all_positions():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/strategies")
+async def get_strategies():
+    """Get list of available trading strategies."""
+    try:
+        from ..services.strategies.registry import get_strategy_list
+        return get_strategy_list()
+    except Exception as e:
+        logger.error(f"Error getting strategies: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/backtest/{instrument}")
 async def run_backtest(
     instrument: str,
     timeframe: str = "H4",
-    candles: int = 500
+    candles: int = 500,
+    strategy: str = "rsi_ema200"
 ):
     """
-    Run a backtest on historical data using the currently configured strategy.
+    Run a backtest on historical data.
 
     Args:
         instrument: Currency pair (EUR_USD, GBP_USD, etc.)
         timeframe: Candle granularity (H1, H4, D)
         candles: Number of candles to test (max 5000)
+        strategy: Strategy ID (triple_ema, rsi_ema200)
     """
     try:
         oanda = get_oanda_client()
@@ -199,7 +212,8 @@ async def run_backtest(
 
         backtester = Backtester(
             oanda_client=oanda,
-            instrument=instrument
+            instrument=instrument,
+            strategy_id=strategy
         )
 
         result = backtester.run(

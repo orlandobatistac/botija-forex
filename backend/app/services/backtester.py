@@ -70,14 +70,15 @@ class StrategyProtocol(Protocol):
 class Backtester:
     """
     Dynamic backtesting engine using OANDA historical data.
-    Automatically uses the currently configured strategy.
+    Supports multiple strategies via registry.
     """
 
     def __init__(
         self,
         oanda_client: OandaClient,
         instrument: str = "EUR_USD",
-        strategy: Optional[StrategyProtocol] = None
+        strategy: Optional[StrategyProtocol] = None,
+        strategy_id: Optional[str] = None
     ):
         """
         Initialize backtester.
@@ -85,7 +86,8 @@ class Backtester:
         Args:
             oanda_client: OANDA API client
             instrument: Currency pair
-            strategy: Strategy instance (if None, uses configured strategy)
+            strategy: Strategy instance (if provided, ignores strategy_id)
+            strategy_id: Strategy ID from registry (e.g., 'triple_ema', 'rsi_ema200')
         """
         self.oanda = oanda_client
         self.instrument = instrument
@@ -93,36 +95,24 @@ class Backtester:
 
         # Pip value for calculations
         self.pip_value = 0.0001 if "JPY" not in instrument else 0.01
-        
+
         # Spread cost per trade (realistic for major pairs)
         self.spread_pips = 1.5  # EUR_USD typical spread
 
         # Load strategy
-        self.strategy = strategy or self._load_configured_strategy()
+        self.strategy = strategy or self._load_strategy(strategy_id)
         self.strategy_name = self.strategy.__class__.__name__ if self.strategy else "Unknown"
 
-    def _load_configured_strategy(self) -> Optional[StrategyProtocol]:
-        """Load the currently configured strategy."""
+    def _load_strategy(self, strategy_id: Optional[str] = None) -> Optional[StrategyProtocol]:
+        """Load strategy from registry."""
         try:
-            use_triple_ema = getattr(Config, 'USE_TRIPLE_EMA_STRATEGY', True)
-
-            if use_triple_ema:
-                from .strategies.triple_ema import TripleEMAStrategy
-                return TripleEMAStrategy(
-                    rr_ratio=getattr(Config, 'TRIPLE_EMA_RR_RATIO', 2.0),
-                    use_adx_filter=True,
-                    use_slope_filter=True
-                )
-
-            # Add more strategies here as they are implemented
-            # elif getattr(Config, 'USE_OTHER_STRATEGY', False):
-            #     from .strategies.other import OtherStrategy
-            #     return OtherStrategy()
-
-            # Default fallback
-            from .strategies.triple_ema import TripleEMAStrategy
-            return TripleEMAStrategy()
-
+            from .strategies.registry import load_strategy, get_default_strategy_id
+            
+            if not strategy_id:
+                strategy_id = get_default_strategy_id()
+            
+            return load_strategy(strategy_id)
+            
         except Exception as e:
             self.logger.error(f"Failed to load strategy: {e}")
             return None
@@ -327,7 +317,7 @@ class Backtester:
         gross_pips = sum(t.pnl_pips for t in trades)
         spread_cost = self.spread_pips * len(trades)
         net_pips = gross_pips - spread_cost
-        
+
         gross_profit = sum(t.pnl_pips for t in winning_trades)
         gross_loss = abs(sum(t.pnl_pips for t in losing_trades))
 
