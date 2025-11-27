@@ -1038,7 +1038,7 @@
             this.backtestRunning = true;
             this.backtestResult = null;
             try {
-              const response = await fetch(`/api/v1/market/backtest/${this.botStatus.instrument}?granularity=${this.backtestTimeframe}&count=${this.backtestCandles}`);
+              const response = await fetch(`/api/v1/market/backtest/${this.botStatus.instrument}?timeframe=${this.backtestTimeframe}&candles=${this.backtestCandles}`);
               if (!response.ok) throw new Error('Backtest failed');
               this.backtestResult = await response.json();
             } catch (error) {
