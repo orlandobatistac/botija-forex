@@ -260,6 +260,39 @@ async def get_scheduler():
     return get_scheduler_status()
 
 
+@router.get("/config")
+async def get_public_config():
+    """Get public configuration (no secrets)"""
+    # Mask account ID
+    account_id = Config.OANDA_ACCOUNT_ID
+    if account_id and len(account_id) > 8:
+        masked_id = account_id[:8] + "****" + account_id[-4:]
+    else:
+        masked_id = "****"
+    
+    return {
+        "account": {
+            "account_id": masked_id,
+            "environment": Config.OANDA_ENVIRONMENT.upper(),
+            "granularity": Config.OANDA_GRANULARITY,
+        },
+        "trading": {
+            "instrument": Config.DEFAULT_INSTRUMENT,
+            "leverage": getattr(Config, 'ACCOUNT_LEVERAGE', 50),
+            "trade_amount_percent": Config.TRADE_AMOUNT_PERCENT,
+            "min_balance_percent": Config.MIN_BALANCE_PERCENT,
+        },
+        "risk": {
+            "stop_loss_pips": Config.STOP_LOSS_PIPS,
+            "take_profit_pips": Config.TAKE_PROFIT_PIPS,
+            "trailing_stop_pips": Config.TRAILING_STOP_PIPS,
+        },
+        "scheduler": {
+            "interval_hours": Config.TRADING_INTERVAL_HOURS,
+        }
+    }
+
+
 @router.get("/logs")
 async def get_logs(limit: int = 100, level: str = None):
     """Get recent bot logs"""

@@ -31,6 +31,13 @@
             <h1 class="text-xl font-bold">Botija Forex AI Trading Bot</h1>
           </div>
           <div class="flex items-center gap-6">
+            <button
+              @click="showConfigModal = true; fetchConfig()"
+              class="text-gray-400 hover:text-white transition-colors"
+              title="Configuration"
+            >
+              ⚙️
+            </button>
             <div x-show="!loading && status" class="flex items-center gap-2">
               <span
                 class="inline-block w-3 h-3 bg-green-500 rounded-full animate-pulse"
@@ -588,6 +595,102 @@
         </div>
       </main>
 
+      <!-- Config Modal -->
+      <div
+        x-show="showConfigModal"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+        @click.self="showConfigModal = false"
+      >
+        <div class="bg-gray-800 rounded-xl border border-gray-600 p-6 w-full max-w-lg mx-4 shadow-2xl">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold flex items-center gap-2">
+              <span>⚙️</span> Configuration
+            </h2>
+            <button @click="showConfigModal = false" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+          </div>
+          
+          <div x-show="!config" class="text-center py-8 text-gray-400">Loading...</div>
+          
+          <div x-show="config" class="space-y-6">
+            <!-- Account Section -->
+            <div>
+              <h3 class="text-sm font-semibold text-gray-400 uppercase mb-3">Account</h3>
+              <div class="grid grid-cols-3 gap-4">
+                <div class="bg-gray-700/50 rounded-lg p-3">
+                  <div class="text-xs text-gray-400">Account ID</div>
+                  <div class="font-mono text-sm" x-text="config?.account?.account_id"></div>
+                </div>
+                <div class="bg-gray-700/50 rounded-lg p-3">
+                  <div class="text-xs text-gray-400">Environment</div>
+                  <div class="font-semibold" :class="config?.account?.environment === 'LIVE' ? 'text-red-400' : 'text-green-400'" x-text="config?.account?.environment"></div>
+                </div>
+                <div class="bg-gray-700/50 rounded-lg p-3">
+                  <div class="text-xs text-gray-400">Timeframe</div>
+                  <div class="font-semibold text-blue-400" x-text="config?.account?.granularity"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Trading Section -->
+            <div>
+              <h3 class="text-sm font-semibold text-gray-400 uppercase mb-3">Trading</h3>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="bg-gray-700/50 rounded-lg p-3">
+                  <div class="text-xs text-gray-400">Instrument</div>
+                  <div class="font-semibold text-cyan-400" x-text="config?.trading?.instrument"></div>
+                </div>
+                <div class="bg-gray-700/50 rounded-lg p-3">
+                  <div class="text-xs text-gray-400">Leverage</div>
+                  <div class="font-semibold text-yellow-400" x-text="config?.trading?.leverage + ':1'"></div>
+                </div>
+                <div class="bg-gray-700/50 rounded-lg p-3">
+                  <div class="text-xs text-gray-400">Trade Amount</div>
+                  <div class="font-semibold" x-text="config?.trading?.trade_amount_percent + '% margin'"></div>
+                </div>
+                <div class="bg-gray-700/50 rounded-lg p-3">
+                  <div class="text-xs text-gray-400">Min Reserve</div>
+                  <div class="font-semibold" x-text="config?.trading?.min_balance_percent + '%'"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Risk Section -->
+            <div>
+              <h3 class="text-sm font-semibold text-gray-400 uppercase mb-3">Risk Management</h3>
+              <div class="grid grid-cols-3 gap-4">
+                <div class="bg-gray-700/50 rounded-lg p-3">
+                  <div class="text-xs text-gray-400">Stop Loss</div>
+                  <div class="font-semibold text-red-400" x-text="config?.risk?.stop_loss_pips + ' pips'"></div>
+                </div>
+                <div class="bg-gray-700/50 rounded-lg p-3">
+                  <div class="text-xs text-gray-400">Take Profit</div>
+                  <div class="font-semibold text-green-400" x-text="config?.risk?.take_profit_pips + ' pips'"></div>
+                </div>
+                <div class="bg-gray-700/50 rounded-lg p-3">
+                  <div class="text-xs text-gray-400">Trailing Stop</div>
+                  <div class="font-semibold text-purple-400" x-text="config?.risk?.trailing_stop_pips + ' pips'"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Scheduler Section -->
+            <div>
+              <h3 class="text-sm font-semibold text-gray-400 uppercase mb-3">Scheduler</h3>
+              <div class="bg-gray-700/50 rounded-lg p-3 inline-block">
+                <div class="text-xs text-gray-400">Interval</div>
+                <div class="font-semibold text-blue-400" x-text="'Every ' + config?.scheduler?.interval_hours + ' hours'"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Footer -->
       <footer class="border-t border-gray-700 bg-gray-950 mt-8">
         <div
@@ -606,6 +709,8 @@
           status: null,
           schedulerCountdown: 0,
           lastServerSync: Date.now(),
+          showConfigModal: false,
+          config: null,
           botStatus: {
             is_running: false,
             balance: 0,
@@ -900,6 +1005,17 @@
               console.error("Error running manual cycle:", err);
             } finally {
               this.manualCycleRunning = false;
+            }
+          },
+
+          async fetchConfig() {
+            try {
+              const response = await fetch("/api/v1/bot/config");
+              if (response.ok) {
+                this.config = await response.json();
+              }
+            } catch (err) {
+              console.error("Error fetching config:", err);
             }
           },
 
