@@ -510,3 +510,9 @@ class TripleEMAStrategy:
             adx=round(adx, 1),
             slope=round(slope, 6)
         )
+
+    def generate_signal(self, df: pd.DataFrame) -> TripleEMASignal:
+        """
+        Alias for analyze() - implements StrategyProtocol for backtester.
+        """
+        return self.analyze(df)
