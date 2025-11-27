@@ -1094,11 +1094,13 @@
                 'D': 1       // 1 per day
               };
               const daysPerMonth = 30;
-              const candles = Math.min(
-                this.backtestMonths * daysPerMonth * (candlesPerDay[this.backtestTimeframe] || 6),
-                5000  // OANDA limit
-              );
+              let candles = this.backtestMonths * daysPerMonth * (candlesPerDay[this.backtestTimeframe] || 6);
               
+              // Ensure minimum 300 candles (EMA 200 + buffer)
+              candles = Math.max(candles, 300);
+              // Cap at OANDA limit
+              candles = Math.min(candles, 5000);
+
               const response = await fetch(`/api/v1/market/backtest/${this.botStatus.instrument}?timeframe=${this.backtestTimeframe}&candles=${candles}&strategy=${this.backtestStrategy}`);
               if (!response.ok) throw new Error('Backtest failed');
               this.backtestResult = await response.json();

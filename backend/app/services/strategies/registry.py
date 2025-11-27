@@ -74,12 +74,15 @@ def load_strategy(strategy_id: str, params: Optional[Dict[str, Any]] = None):
     Returns:
         Strategy instance
     """
+    logger.info(f"Loading strategy: {strategy_id}")
+    
     if strategy_id not in STRATEGIES:
         logger.error(f"Unknown strategy: {strategy_id}")
         # Default to RSI + EMA200
         strategy_id = "rsi_ema200"
 
     info = STRATEGIES[strategy_id]
+    logger.info(f"Found strategy info: {info.name}")
 
     # Merge default params with provided params
     final_params = {**info.default_params}
@@ -89,10 +92,12 @@ def load_strategy(strategy_id: str, params: Optional[Dict[str, Any]] = None):
     try:
         if strategy_id == "triple_ema":
             from .triple_ema import TripleEMAStrategy
+            logger.info("Instantiating TripleEMAStrategy")
             return TripleEMAStrategy(**final_params)
 
         elif strategy_id == "rsi_ema200":
             from .rsi_ema200 import RSIEMA200Strategy
+            logger.info("Instantiating RSIEMA200Strategy")
             return RSIEMA200Strategy(**final_params)
 
         else:
