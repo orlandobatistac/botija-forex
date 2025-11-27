@@ -757,8 +757,15 @@
             <!-- Strategy & Summary -->
             <div class="bg-gray-700/50 rounded-lg p-4">
               <div class="flex justify-between items-center mb-3">
-                <span class="text-sm text-gray-400">Strategy</span>
-                <span class="font-semibold text-purple-400" x-text="backtestResult?.strategy"></span>
+                <div>
+                  <span class="text-sm text-gray-400">Strategy: </span>
+                  <span class="font-semibold text-purple-400" x-text="backtestResult?.strategy"></span>
+                </div>
+                <div class="text-xs text-gray-400">
+                  <span x-text="backtestResult?.start_date?.split('T')[0]"></span>
+                  <span class="mx-1">→</span>
+                  <span x-text="backtestResult?.end_date?.split('T')[0]"></span>
+                </div>
               </div>
               <div class="grid grid-cols-3 md:grid-cols-6 gap-3 text-center">
                 <div>
