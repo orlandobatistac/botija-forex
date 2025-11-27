@@ -75,3 +75,7 @@ class Config:
     API_HOST = os.getenv("API_HOST", "0.0.0.0")
     API_PORT = int(os.getenv("API_PORT", 8001))
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+
+
+# Singleton instance for easy import
+settings = Config()
