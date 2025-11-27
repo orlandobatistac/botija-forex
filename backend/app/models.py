@@ -84,6 +84,7 @@ class TradingCycle(Base):
     execution_time_ms = Column(Integer, nullable=True)
     trading_mode = Column(String)  # DEMO, LIVE
     trigger = Column(String, nullable=True)  # manual, scheduled
+    strategy = Column(String, nullable=True)  # Triple EMA, etc.
     error_message = Column(Text, nullable=True)
 
 

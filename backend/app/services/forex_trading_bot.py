@@ -508,6 +508,7 @@ class ForexTradingBot:
         from ..database import SessionLocal
 
         start_time = time.time()
+        strategy_name = "Triple EMA" if self.use_triple_ema else "Legacy"
         cycle_data = {
             'instrument': self.instrument,
             'price': 0,
@@ -523,6 +524,7 @@ class ForexTradingBot:
             'trade_id': None,
             'profit_loss': None,
             'trading_mode': Config.TRADING_MODE,
+            'strategy': strategy_name,
             'error_message': None
         }
 
@@ -547,10 +549,24 @@ class ForexTradingBot:
             cycle_data['ema_slow'] = tech.get('ema50', 0)
             cycle_data['rsi'] = tech.get('rsi14', 0)
 
-            ai_sig = analysis.get('ai_signal', {})
-            cycle_data['ai_signal'] = ai_sig.get('signal', 'HOLD')
-            cycle_data['ai_confidence'] = ai_sig.get('confidence', 0)
-            cycle_data['ai_reason'] = ai_sig.get('reason')
+            # Signal: use Triple EMA if enabled, otherwise AI
+            triple_ema_result = analysis.get('triple_ema_signal')
+            if self.use_triple_ema and triple_ema_result:
+                # Map Triple EMA direction to signal format
+                direction = triple_ema_result.get('direction', 'WAIT')
+                if direction == 'LONG':
+                    cycle_data['ai_signal'] = 'BUY'
+                elif direction == 'SHORT':
+                    cycle_data['ai_signal'] = 'SELL'
+                else:
+                    cycle_data['ai_signal'] = 'HOLD'
+                cycle_data['ai_confidence'] = triple_ema_result.get('confidence', 0)
+                cycle_data['ai_reason'] = triple_ema_result.get('reason', '')
+            else:
+                ai_sig = analysis.get('ai_signal', {})
+                cycle_data['ai_signal'] = ai_sig.get('signal', 'HOLD')
+                cycle_data['ai_confidence'] = ai_sig.get('confidence', 0)
+                cycle_data['ai_reason'] = ai_sig.get('reason')
 
             # Log market data
             self.logger.info(f"💱 {self.instrument}: {analysis.get('current_price', 0):.5f} (spread: {analysis.get('spread_pips', 0):.1f} pips)")
@@ -675,6 +691,7 @@ class ForexTradingBot:
                 execution_time_ms=execution_time_ms,
                 trading_mode=cycle_data['trading_mode'],
                 trigger=trigger,
+                strategy=cycle_data.get('strategy', 'Legacy'),
                 error_message=cycle_data['error_message']
             )
             db.add(cycle)

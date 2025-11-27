@@ -92,6 +92,7 @@ class TradingCycleCreate(TradingCycleBase):
     profit_loss: Optional[float] = None
     execution_time_ms: Optional[int] = None
     trigger: Optional[str] = None
+    strategy: Optional[str] = None
     error_message: Optional[str] = None
 
 
@@ -104,6 +105,7 @@ class TradingCycleResponse(TradingCycleBase):
     profit_loss: Optional[float] = None
     execution_time_ms: Optional[int] = None
     trigger: Optional[str] = None
+    strategy: Optional[str] = None
 
     class Config:
         from_attributes = True
