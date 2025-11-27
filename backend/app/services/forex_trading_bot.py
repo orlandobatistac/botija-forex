@@ -572,7 +572,7 @@ class ForexTradingBot:
             self.logger.info(f"💱 {self.instrument}: {analysis.get('current_price', 0):.5f} (spread: {analysis.get('spread_pips', 0):.1f} pips)")
             self.logger.info(f"💰 Balance: ${analysis.get('balance', 0):,.2f} | Position: {analysis.get('position_units', 0)} units")
             self.logger.info(f"📈 EMA{Config.EMA_FAST_PERIOD}: {tech.get('ema20', 0):.5f} | EMA{Config.EMA_SLOW_PERIOD}: {tech.get('ema50', 0):.5f} | RSI: {tech.get('rsi14', 0):.1f}")
-            self.logger.info(f"🤖 AI Signal: {ai_sig.get('signal', 'N/A')} (confidence: {ai_sig.get('confidence', 0):.0%})")
+            self.logger.info(f"🤖 Signal: {cycle_data['ai_signal']} (confidence: {cycle_data['ai_confidence']:.0%}) - Strategy: {strategy_name}")
 
             # Update trailing stop if position exists
             trailing_result = None
