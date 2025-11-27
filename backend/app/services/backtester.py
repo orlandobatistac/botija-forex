@@ -99,35 +99,37 @@ class Backtester:
         # Spread cost per trade (realistic for major pairs)
         self.spread_pips = 1.5  # EUR_USD typical spread
 
-        # Load strategy
-        self._strategy_id = strategy_id
-        self.strategy = strategy or self._load_strategy(strategy_id)
+        # Load strategy - get actual ID used
+        if strategy:
+            self.strategy = strategy
+            self._strategy_id = strategy_id
+        else:
+            self.strategy, self._strategy_id = self._load_strategy(strategy_id)
         self.strategy_name = self._get_strategy_name()
 
     def _get_strategy_name(self) -> str:
         """Get friendly strategy name from registry."""
         try:
-            from .strategies.registry import STRATEGIES, get_default_strategy_id
-            sid = self._strategy_id or get_default_strategy_id()
-            if sid in STRATEGIES:
-                return STRATEGIES[sid].name
+            from .strategies.registry import STRATEGIES
+            if self._strategy_id and self._strategy_id in STRATEGIES:
+                return STRATEGIES[self._strategy_id].name
         except:
             pass
         return self.strategy.__class__.__name__ if self.strategy else "Unknown"
 
-    def _load_strategy(self, strategy_id: Optional[str] = None) -> Optional[StrategyProtocol]:
-        """Load strategy from registry."""
+    def _load_strategy(self, strategy_id: Optional[str] = None):
+        """Load strategy from registry. Returns (strategy, actual_id)."""
         try:
             from .strategies.registry import load_strategy, get_default_strategy_id
 
             if not strategy_id:
                 strategy_id = get_default_strategy_id()
 
-            return load_strategy(strategy_id)
+            return load_strategy(strategy_id), strategy_id
 
         except Exception as e:
             self.logger.error(f"Failed to load strategy: {e}")
-            return None
+            return None, strategy_id
 
     def _price_to_pips(self, price_diff: float) -> float:
         """Convert price difference to pips"""
