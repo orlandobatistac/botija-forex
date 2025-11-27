@@ -44,6 +44,17 @@ async def get_bot_status(db: Session = Depends(get_db)):
 async def get_dashboard(db: Session = Depends(get_db)):
     """Get dashboard data"""
     try:
+        # Get live data from OANDA
+        bot = get_trading_bot()
+        live_balance = 0.0
+        live_nav = 0.0
+        live_unrealized_pl = 0.0
+
+        if bot and bot.oanda:
+            live_balance = bot.oanda.get_balance()
+            live_nav = bot.oanda.get_nav()
+            live_unrealized_pl = live_nav - live_balance  # NAV - Balance = Unrealized P/L
+
         status = db.query(models.BotStatus).order_by(models.BotStatus.id.desc()).first()
 
         # Si no hay status, usar último ciclo como fallback
@@ -56,10 +67,10 @@ async def get_dashboard(db: Session = Depends(get_db)):
                 return schemas.DashboardResponse(
                     mode=last_cycle.trading_mode,
                     instrument=last_cycle.instrument,
-                    balance=last_cycle.balance,
-                    nav=last_cycle.balance,
+                    balance=live_balance or last_cycle.balance,
+                    nav=live_nav or last_cycle.balance,
                     position_units=last_cycle.position_units,
-                    unrealized_pl=0.0,
+                    unrealized_pl=live_unrealized_pl,
                     is_running=False,
                     last_price=last_cycle.price,
                     spread_pips=last_cycle.spread_pips,
@@ -69,10 +80,10 @@ async def get_dashboard(db: Session = Depends(get_db)):
             return schemas.DashboardResponse(
                 mode=Config.TRADING_MODE,
                 instrument=Config.DEFAULT_INSTRUMENT,
-                balance=0.0,
-                nav=0.0,
+                balance=live_balance,
+                nav=live_nav,
                 position_units=0,
-                unrealized_pl=0.0,
+                unrealized_pl=live_unrealized_pl,
                 is_running=False,
                 status="not_initialized"
             )
@@ -80,10 +91,10 @@ async def get_dashboard(db: Session = Depends(get_db)):
         return schemas.DashboardResponse(
             mode=status.trading_mode,
             instrument=status.instrument,
-            balance=status.balance,
-            nav=status.nav,
+            balance=live_balance or status.balance,
+            nav=live_nav or status.nav,
             position_units=status.position_units,
-            unrealized_pl=status.unrealized_pl,
+            unrealized_pl=live_unrealized_pl or status.unrealized_pl,
             is_running=status.is_running,
             status="ready"
         )
