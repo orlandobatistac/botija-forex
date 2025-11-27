@@ -27,11 +27,11 @@ STRATEGIES: Dict[str, StrategyInfo] = {
     "triple_ema": StrategyInfo(
         id="triple_ema",
         name="Triple EMA",
-        description="Trend following with EMA 20/50/200 + ATR-based SL + R:R 1:3",
+        description="Trend following with EMA 20/50/200 + ATR SL + R:R 1:4 + ADX>30",
         class_path="backend.app.services.strategies.triple_ema.TripleEMAStrategy",
         default_params={
-            "rr_ratio": 3.0,  # 1:3 para compensar bajo win rate
-            "min_adx": 25.0,  # Más estricto para filtrar laterales
+            "rr_ratio": 4.0,  # 1:4 para compensar win rate ~30%
+            "min_adx": 30.0,  # Solo tendencias muy fuertes
             "atr_sl_multiplier": 1.5,  # SL = 1.5x ATR
             "use_atr_sl": True,
             "use_adx_filter": True,
