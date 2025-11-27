@@ -38,31 +38,24 @@ jobs:
             ssh-add ~/.ssh/github_deploy
             
             # Deploy
-            cd /root/botija || exit 1
+            cd /var/www/botija-forex || exit 1
             
-            # Ensure using SSH remote
-            git remote set-url origin git@github.com:orlandobatistac/botija.git
-            
-            echo "📦 Resetting local changes..."
-            git reset --hard origin/main
             echo "📦 Pulling latest code..."
             git pull origin main
             
             echo "📦 Installing dependencies..."
-            source venv_botija/bin/activate
-            cd backend
-            pip install -r requirements.txt --quiet
+            source venv/bin/activate
+            pip install -r backend/requirements.txt --quiet
             
             echo "🔄 Restarting bot service..."
-            cd ..
-            systemctl restart botija
+            systemctl restart botija-forex
             sleep 3
             
             echo "✅ Verifying service..."
-            if systemctl is-active --quiet botija; then
-              echo "✅ Deployment successful - botija service is running"
+            if systemctl is-active --quiet botija-forex; then
+              echo "✅ Deployment successful - botija-forex service is running"
             else
-              echo "❌ Deployment failed - botija service is not running"
-              systemctl status botija
+              echo "❌ Deployment failed - botija-forex service is not running"
+              systemctl status botija-forex
               exit 1
             fi
