@@ -61,16 +61,22 @@ class ForexTradingBot:
         self.ai = AISignalValidator(openai_api_key)
         self.telegram = TelegramAlerts(telegram_token, telegram_chat_id) if telegram_token else None
 
-        # Trailing Stop
+        # Trailing Stop - disabled for hybrid strategy (uses ATR-based TP)
         self.trailing_stop_enabled = trailing_stop_enabled
         self.trailing_stop = None
-        if trailing_stop_enabled and self.oanda:
+        
+        # Disable trailing stop for strategies with dynamic TP (hybrid, adaptive)
+        uses_dynamic_tp = Config.DEFAULT_STRATEGY in ['hybrid', 'adaptive']
+        
+        if trailing_stop_enabled and self.oanda and not uses_dynamic_tp:
             self.trailing_stop = ForexTrailingStop(
                 oanda_client=self.oanda,
                 trailing_distance_pips=trailing_stop_distance_pips,
                 activation_pips=trailing_stop_activation_pips
             )
             self.logger.info(f"📍 Trailing stop enabled: {trailing_stop_distance_pips} pips (activates at +{trailing_stop_activation_pips} pips)")
+        elif uses_dynamic_tp:
+            self.logger.info(f"📍 Trailing stop disabled for {Config.DEFAULT_STRATEGY} (uses ATR-based TP)")
 
         # Risk Manager
         self.risk_manager = None
