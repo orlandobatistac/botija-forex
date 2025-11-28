@@ -4,11 +4,30 @@ Controls position sizing, drawdown limits, and daily loss limits
 """
 
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Set
 from datetime import datetime, date
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
+
+
+# Portfolio Configuration - Approved pairs and strategies
+PORTFOLIO_CONFIG = {
+    "EUR_USD": {"strategy": "hybrid", "enabled": True},
+    "USD_JPY": {"strategy": "hybrid", "enabled": True},
+    "GBP_USD": {"strategy": "macd_only", "enabled": True},  # Breakout disabled
+    "AUD_USD": {"strategy": None, "enabled": False},  # Excluded
+    "USD_CAD": {"strategy": None, "enabled": False},  # Excluded
+}
+
+
+@dataclass
+class OpenPosition:
+    """Track open position risk"""
+    pair: str
+    units: int
+    risk_percent: float
+    entry_time: datetime
 
 
 @dataclass
@@ -37,6 +56,8 @@ class RiskManager:
     - Maximum drawdown protection
     - Dynamic position sizing based on volatility
     - Consecutive loss protection
+    - Portfolio aggregate risk limit (max 3% total exposure)
+    - Per-pair strategy configuration
     """
 
     def __init__(
@@ -45,7 +66,8 @@ class RiskManager:
         max_drawdown_percent: float = 10.0,
         max_consecutive_losses: int = 3,
         position_size_reduction_after_loss: float = 0.5,
-        base_risk_per_trade_percent: float = 1.0
+        base_risk_per_trade_percent: float = 1.0,
+        max_aggregate_risk_percent: float = 3.0
     ):
         """
         Initialize risk manager.
@@ -56,17 +78,23 @@ class RiskManager:
             max_consecutive_losses: Lock trading after N consecutive losses (default 3)
             position_size_reduction_after_loss: Reduce size to X% after loss (default 50%)
             base_risk_per_trade_percent: Base risk per trade as % of balance (default 1%)
+            max_aggregate_risk_percent: Maximum total risk across all open positions (default 3%)
         """
         self.max_daily_loss_percent = max_daily_loss_percent
         self.max_drawdown_percent = max_drawdown_percent
         self.max_consecutive_losses = max_consecutive_losses
         self.position_size_reduction = position_size_reduction_after_loss
         self.base_risk_percent = base_risk_per_trade_percent
+        self.max_aggregate_risk = max_aggregate_risk_percent
 
         self.logger = logger
         self.daily_stats: Optional[DailyStats] = None
         self.consecutive_losses = 0
         self.last_trade_was_loss = False
+
+        # Portfolio tracking
+        self.open_positions: Dict[str, OpenPosition] = {}
+        self.portfolio_config = PORTFOLIO_CONFIG
 
     def initialize_day(self, balance: float) -> DailyStats:
         """Initialize daily statistics"""
@@ -252,3 +280,123 @@ class RiskManager:
             self.daily_stats.lock_reason = None
             self.consecutive_losses = 0
             self.logger.info("🔓 Trading lock manually reset")
+
+    # ==================== PORTFOLIO MANAGEMENT ====================
+
+    def is_pair_enabled(self, pair: str) -> bool:
+        """Check if a pair is enabled for trading"""
+        config = self.portfolio_config.get(pair, {})
+        return config.get("enabled", False)
+
+    def get_pair_strategy(self, pair: str) -> Optional[str]:
+        """Get the approved strategy for a pair"""
+        config = self.portfolio_config.get(pair, {})
+        if not config.get("enabled", False):
+            return None
+        return config.get("strategy")
+
+    def is_breakout_allowed(self, pair: str) -> bool:
+        """Check if breakout strategy is allowed for a pair"""
+        strategy = self.get_pair_strategy(pair)
+        return strategy == "hybrid"  # Only hybrid allows breakout
+
+    def get_current_aggregate_risk(self) -> float:
+        """Calculate total risk across all open positions"""
+        return sum(pos.risk_percent for pos in self.open_positions.values())
+
+    def can_open_position(self, pair: str, risk_percent: float) -> Dict:
+        """
+        Check if a new position can be opened based on portfolio rules.
+
+        Args:
+            pair: Currency pair
+            risk_percent: Risk for the new position as % of balance
+
+        Returns:
+            Dict with can_open, reason, and available_risk
+        """
+        result = {
+            "can_open": True,
+            "reason": None,
+            "current_risk": self.get_current_aggregate_risk(),
+            "available_risk": 0.0,
+            "warnings": []
+        }
+
+        # Check if pair is enabled
+        if not self.is_pair_enabled(pair):
+            result["can_open"] = False
+            result["reason"] = f"❌ {pair} is not in the approved portfolio"
+            self.logger.warning(result["reason"])
+            return result
+
+        # Check if we already have a position in this pair
+        if pair in self.open_positions:
+            result["can_open"] = False
+            result["reason"] = f"⚠️ Already have open position in {pair}"
+            return result
+
+        # Check aggregate risk limit
+        current_risk = result["current_risk"]
+        available_risk = self.max_aggregate_risk - current_risk
+        result["available_risk"] = available_risk
+
+        if risk_percent > available_risk:
+            result["can_open"] = False
+            result["reason"] = (
+                f"🛑 Aggregate risk limit reached: {current_risk:.1f}% used of {self.max_aggregate_risk}% max. "
+                f"Available: {available_risk:.1f}%, Requested: {risk_percent:.1f}%"
+            )
+            self.logger.warning(result["reason"])
+            return result
+
+        # Add warning if approaching limit
+        if current_risk + risk_percent > self.max_aggregate_risk * 0.8:
+            result["warnings"].append(
+                f"⚠️ Approaching aggregate risk limit: {current_risk + risk_percent:.1f}% of {self.max_aggregate_risk}%"
+            )
+
+        return result
+
+    def register_position(self, pair: str, units: int, risk_percent: float):
+        """Register a new open position"""
+        self.open_positions[pair] = OpenPosition(
+            pair=pair,
+            units=units,
+            risk_percent=risk_percent,
+            entry_time=datetime.utcnow()
+        )
+        self.logger.info(
+            f"📊 Position registered: {pair} | Risk: {risk_percent:.1f}% | "
+            f"Total aggregate: {self.get_current_aggregate_risk():.1f}%"
+        )
+
+    def close_position(self, pair: str):
+        """Remove a closed position from tracking"""
+        if pair in self.open_positions:
+            pos = self.open_positions.pop(pair)
+            self.logger.info(
+                f"📊 Position closed: {pair} | Released risk: {pos.risk_percent:.1f}% | "
+                f"Remaining aggregate: {self.get_current_aggregate_risk():.1f}%"
+            )
+
+    def get_portfolio_status(self) -> Dict:
+        """Get current portfolio risk status"""
+        current_risk = self.get_current_aggregate_risk()
+        return {
+            "open_positions": len(self.open_positions),
+            "positions": {
+                pair: {
+                    "units": pos.units,
+                    "risk_percent": pos.risk_percent,
+                    "entry_time": pos.entry_time.isoformat()
+                }
+                for pair, pos in self.open_positions.items()
+            },
+            "aggregate_risk_percent": current_risk,
+            "max_aggregate_risk": self.max_aggregate_risk,
+            "available_risk": self.max_aggregate_risk - current_risk,
+            "utilization_percent": (current_risk / self.max_aggregate_risk * 100) if self.max_aggregate_risk > 0 else 0,
+            "enabled_pairs": [p for p, c in self.portfolio_config.items() if c.get("enabled")],
+            "excluded_pairs": [p for p, c in self.portfolio_config.items() if not c.get("enabled")]
+        }

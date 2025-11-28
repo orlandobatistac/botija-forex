@@ -15,6 +15,8 @@ import numpy as np
 from pathlib import Path
 from dataclasses import dataclass
 from itertools import product
+from joblib import Parallel, delayed
+import multiprocessing
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -295,36 +297,47 @@ class HybridOptimizer:
             'macd_pips': sum(t['pips'] for t in macd_trades)
         }
 
-    def optimize(self, df: pd.DataFrame, min_trades: int = 15) -> tuple:
-        """Grid search para mejores parámetros"""
-        best_pf = 0
-        best_params = None
-        best_metrics = None
+    def _evaluate_params(self, df: pd.DataFrame, params: dict, min_trades: int) -> tuple:
+        """Evaluar un conjunto de parámetros (para paralelismo)"""
+        metrics = self.backtest(df, params)
+        score = 0
 
+        if metrics['trades'] >= min_trades and metrics['pf'] > 0:
+            # Bonus si usa ambas estrategias
+            if metrics['breakout_trades'] >= 3 and metrics['macd_trades'] >= 3:
+                score = metrics['pf']
+            elif metrics['pf'] > 1.2:  # Si es mucho mejor, aceptar
+                score = metrics['pf'] * 0.8  # Penalización leve
+
+        return (score, params, metrics)
+
+    def optimize(self, df: pd.DataFrame, min_trades: int = 15) -> tuple:
+        """Grid search paralelo para mejores parámetros"""
         param_names = list(self.PARAM_GRID.keys())
         param_values = list(self.PARAM_GRID.values())
 
-        total_combos = 1
-        for v in param_values:
-            total_combos *= len(v)
+        # Generar todas las combinaciones
+        all_combos = [dict(zip(param_names, values)) for values in product(*param_values)]
 
-        tested = 0
-        for values in product(*param_values):
-            tested += 1
-            params = dict(zip(param_names, values))
-            metrics = self.backtest(df, params)
+        # Número de CPUs disponibles
+        n_jobs = max(1, multiprocessing.cpu_count() - 1)
 
-            # Criterio: PF alto + mínimo trades + balance entre estrategias
-            if metrics['trades'] >= min_trades and metrics['pf'] > best_pf:
-                # Bonus si usa ambas estrategias
-                if metrics['breakout_trades'] >= 3 and metrics['macd_trades'] >= 3:
-                    best_pf = metrics['pf']
-                    best_params = params
-                    best_metrics = metrics
-                elif metrics['pf'] > best_pf * 1.2:  # Si es mucho mejor, aceptar anyway
-                    best_pf = metrics['pf']
-                    best_params = params
-                    best_metrics = metrics
+        # Ejecutar en paralelo
+        results = Parallel(n_jobs=n_jobs, prefer="processes")(
+            delayed(self._evaluate_params)(df, params, min_trades)
+            for params in all_combos
+        )
+
+        # Encontrar el mejor
+        best_score = 0
+        best_params = None
+        best_metrics = None
+
+        for score, params, metrics in results:
+            if score > best_score:
+                best_score = score
+                best_params = params
+                best_metrics = metrics
 
         return best_params, best_metrics
 
@@ -536,12 +549,12 @@ class WalkForwardHybrid:
         return verdict
 
 
-def run_hybrid_walkforward():
+def run_hybrid_walkforward(pair: str = "EUR_USD"):
     """Ejecutar Walk-Forward del Sistema Híbrido"""
     wf = WalkForwardHybrid(
         train_months=18,
         test_months=6,
-        pair="EUR_USD"
+        pair=pair
     )
 
     results = wf.run()
@@ -551,4 +564,6 @@ def run_hybrid_walkforward():
 
 
 if __name__ == "__main__":
-    run_hybrid_walkforward()
+    import sys
+    pair = sys.argv[1] if len(sys.argv) > 1 else "EUR_USD"
+    run_hybrid_walkforward(pair)

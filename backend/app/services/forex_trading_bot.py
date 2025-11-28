@@ -64,10 +64,10 @@ class ForexTradingBot:
         # Trailing Stop - disabled for hybrid strategy (uses ATR-based TP)
         self.trailing_stop_enabled = trailing_stop_enabled
         self.trailing_stop = None
-        
+
         # Disable trailing stop for strategies with dynamic TP (hybrid, adaptive)
         uses_dynamic_tp = Config.DEFAULT_STRATEGY in ['hybrid', 'adaptive']
-        
+
         if trailing_stop_enabled and self.oanda and not uses_dynamic_tp:
             self.trailing_stop = ForexTrailingStop(
                 oanda_client=self.oanda,
