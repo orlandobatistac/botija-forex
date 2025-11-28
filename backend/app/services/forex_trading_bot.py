@@ -533,7 +533,14 @@ class ForexTradingBot:
             'profit_loss': None,
             'trading_mode': Config.TRADING_MODE,
             'strategy': self.strategy_name,
-            'error_message': None
+            'error_message': None,
+            # Hybrid strategy indicators
+            'adx': None,
+            'macd': None,
+            'macd_signal': None,
+            'ema200': None,
+            'donchian_high': None,
+            'donchian_low': None
         }
 
         try:
@@ -573,9 +580,23 @@ class ForexTradingBot:
                 if isinstance(strategy_result, dict):
                     cycle_data['ai_confidence'] = strategy_result.get('confidence', 0.7)
                     cycle_data['ai_reason'] = strategy_result.get('reason', f"{self.strategy_name}")
+                    # Hybrid indicators from dict
+                    cycle_data['adx'] = strategy_result.get('adx')
+                    cycle_data['macd'] = strategy_result.get('macd')
+                    cycle_data['macd_signal'] = strategy_result.get('macd_signal')
+                    cycle_data['ema200'] = strategy_result.get('ema200')
+                    cycle_data['donchian_high'] = strategy_result.get('donchian_high')
+                    cycle_data['donchian_low'] = strategy_result.get('donchian_low')
                 else:
                     cycle_data['ai_confidence'] = getattr(strategy_result, 'confidence', 0.7)
                     cycle_data['ai_reason'] = getattr(strategy_result, 'reason', f"{self.strategy_name}")
+                    # Hybrid indicators from object
+                    cycle_data['adx'] = getattr(strategy_result, 'adx', None)
+                    cycle_data['macd'] = getattr(strategy_result, 'macd', None)
+                    cycle_data['macd_signal'] = getattr(strategy_result, 'macd_signal', None)
+                    cycle_data['ema200'] = getattr(strategy_result, 'ema200', None)
+                    cycle_data['donchian_high'] = getattr(strategy_result, 'donchian_high', None)
+                    cycle_data['donchian_low'] = getattr(strategy_result, 'donchian_low', None)
             else:
                 # Fallback to AI signal
                 ai_sig = analysis.get('ai_signal', {})
@@ -707,7 +728,14 @@ class ForexTradingBot:
                 trading_mode=cycle_data['trading_mode'],
                 trigger=trigger,
                 strategy=cycle_data.get('strategy', 'Legacy'),
-                error_message=cycle_data['error_message']
+                error_message=cycle_data['error_message'],
+                # Hybrid strategy indicators
+                adx=cycle_data.get('adx'),
+                macd=cycle_data.get('macd'),
+                macd_signal=cycle_data.get('macd_signal'),
+                ema200=cycle_data.get('ema200'),
+                donchian_high=cycle_data.get('donchian_high'),
+                donchian_low=cycle_data.get('donchian_low')
             )
             db.add(cycle)
             db.commit()

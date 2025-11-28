@@ -26,6 +26,13 @@ class HybridSignal:
     strategy_used: str = ""  # "breakout" or "macd"
     regime: str = ""  # "consolidation" or "trending"
     adx: Optional[float] = None
+    
+    # Indicators for display
+    macd: Optional[float] = None
+    macd_signal: Optional[float] = None
+    ema200: Optional[float] = None
+    donchian_high: Optional[float] = None
+    donchian_low: Optional[float] = None
 
     def to_dict(self) -> dict:
         return {
@@ -37,7 +44,12 @@ class HybridSignal:
             "reason": self.reason,
             "strategy_used": self.strategy_used,
             "regime": self.regime,
-            "adx": self.adx
+            "adx": self.adx,
+            "macd": self.macd,
+            "macd_signal": self.macd_signal,
+            "ema200": self.ema200,
+            "donchian_high": self.donchian_high,
+            "donchian_low": self.donchian_low
         }
 
 
@@ -196,8 +208,20 @@ class HybridStrategy:
                 reason=f"No signal ({regime}, ADX={current['adx']:.1f})",
                 regime=regime,
                 adx=current['adx'],
-                strategy_used="breakout" if regime == "consolidation" else "macd"
+                strategy_used="breakout" if regime == "consolidation" else "macd",
+                macd=current['macd'],
+                macd_signal=current['macd_signal'],
+                ema200=current['ema200'],
+                donchian_high=current['donchian_high'],
+                donchian_low=current['donchian_low']
             )
+
+        # Add indicators to signal
+        signal.macd = current['macd']
+        signal.macd_signal = current['macd_signal']
+        signal.ema200 = current['ema200']
+        signal.donchian_high = current['donchian_high']
+        signal.donchian_low = current['donchian_low']
 
         return signal
 

@@ -83,6 +83,13 @@ class TradingCycleBase(BaseModel):
     ai_confidence: float
     action: str
     trading_mode: str
+    # Hybrid strategy indicators
+    adx: Optional[float] = None
+    macd: Optional[float] = None
+    macd_signal: Optional[float] = None
+    ema200: Optional[float] = None
+    donchian_high: Optional[float] = None
+    donchian_low: Optional[float] = None
 
 
 class TradingCycleCreate(TradingCycleBase):

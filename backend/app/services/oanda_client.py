@@ -236,6 +236,66 @@ class OandaClient:
 
         return result
 
+    def get_candles_from_date(
+        self,
+        instrument: str = "EUR_USD",
+        granularity: str = "H4",
+        from_time: str = None,
+        to_time: str = None,
+        count: int = 5000,
+        price: str = "M"
+    ) -> List[Dict]:
+        """
+        Get historical candles starting from a specific date.
+
+        Args:
+            instrument: Currency pair
+            granularity: Timeframe
+            from_time: Start time (RFC3339 format: 2020-01-01T00:00:00Z)
+            to_time: End time (optional)
+            count: Max candles to return
+            price: Price type
+
+        Returns:
+            List of candle dicts
+        """
+        params = {
+            "granularity": granularity,
+            "price": price,
+            "count": count
+        }
+
+        if from_time:
+            params["from"] = from_time
+        if to_time:
+            params["to"] = to_time
+
+        response = self._request(
+            "GET",
+            f"/v3/instruments/{instrument}/candles",
+            params=params
+        )
+
+        if "error" in response:
+            return []
+
+        candles = response.get("candles", [])
+
+        result = []
+        for candle in candles:
+            if candle.get("complete", False):
+                mid = candle.get("mid", {})
+                result.append({
+                    "time": candle.get("time"),
+                    "open": float(mid.get("o", 0)),
+                    "high": float(mid.get("h", 0)),
+                    "low": float(mid.get("l", 0)),
+                    "close": float(mid.get("c", 0)),
+                    "volume": int(candle.get("volume", 0))
+                })
+
+        return result
+
     def get_ohlc(
         self,
         instrument: str = "EUR_USD",
