@@ -55,9 +55,9 @@
 
       <!-- Main Content -->
       <main class="flex-1 max-w-7xl mx-auto w-full px-4 py-8">
-        <!-- Row 1: Bot Status & Portfolio -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <!-- Bot Status (wider) -->
+        <!-- KPIs Row -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <!-- Bot Status -->
           <div
             class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl border border-gray-700 p-5 shadow-lg"
           >
@@ -113,31 +113,13 @@
             ></div>
             <div class="text-xs text-gray-500 mt-1">Available margin</div>
           </div>
-        </div>
-
-        <!-- Row 2: Cycle Info & Actions -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <!-- Next Cycle -->
-          <div
-            class="bg-gradient-to-br from-blue-900/30 to-gray-900 rounded-xl border border-blue-700/50 p-5 shadow-lg"
-          >
-            <div class="text-sm font-medium text-blue-300 mb-2">⏰ Next Cycle</div>
-            <div
-              class="text-3xl font-bold text-blue-400"
-              x-text="formatTime(schedulerCountdown)"
-            ></div>
-            <div
-              class="text-xs text-blue-300/70 mt-1"
-              x-text="schedulerStatus.next_run_time ? toET(schedulerStatus.next_run_time) : 'Not scheduled'"
-            ></div>
-          </div>
 
           <!-- Total P/L -->
           <div
-            class="bg-gradient-to-br from-purple-900/30 to-gray-900 rounded-xl border border-purple-700/50 p-5 shadow-lg"
+            class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl border border-gray-700 p-5 shadow-lg"
           >
             <div class="flex items-center justify-between mb-2">
-              <div class="text-sm font-medium text-purple-300">Total P/L</div>
+              <div class="text-sm font-medium text-gray-400">Unrealized P/L</div>
               <span class="text-xl">📈</span>
             </div>
             <div
@@ -145,64 +127,48 @@
               :class="totalUnrealizedPL > 0 ? 'text-green-400' : totalUnrealizedPL < 0 ? 'text-red-400' : 'text-gray-400'"
               x-text="formatUSD(totalUnrealizedPL)"
             ></div>
-            <div class="text-xs text-purple-300/70 mt-1" x-text="positions.length + ' open position' + (positions.length !== 1 ? 's' : '')"></div>
-          </div>
-
-          <!-- Manual Control -->
-          <div
-            class="bg-gradient-to-br from-green-900/30 to-gray-900 rounded-xl border border-green-700/50 p-5 shadow-lg flex flex-col justify-center"
-          >
-            <button
-              @click="runManualCycle()"
-              :disabled="manualCycleRunning"
-              :class="manualCycleRunning ? 'bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'"
-              class="w-full px-4 py-3 rounded-lg font-bold transition-colors flex items-center justify-center gap-2"
-            >
-              <span x-show="!manualCycleRunning" class="text-base">▶️ Run Manual Cycle</span>
-              <span x-show="manualCycleRunning" class="flex items-center gap-2">
-                <svg
-                  class="animate-spin h-5 w-5"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    class="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    stroke-width="4"
-                  ></circle>
-                  <path
-                    class="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                Running...
-              </span>
-            </button>
-            <div class="text-xs text-center text-green-300/70 mt-2">
-              Execute cycle immediately
-            </div>
+            <div class="text-xs text-gray-500 mt-1" x-text="positions.length + ' open position' + (positions.length !== 1 ? 's' : '')"></div>
           </div>
         </div>
 
-        <!-- Trading Cycles History -->
+        <!-- Trading Cycles -->
         <div
           class="bg-gray-800 rounded-xl border border-gray-700 p-6 mb-6 shadow-lg"
         >
-          <div class="flex justify-between items-center mb-6">
+          <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
             <h2 class="text-xl font-bold flex items-center gap-2">
-              <span>📊</span> Trading Cycles History
+              <span>📊</span> Trading Cycles
             </h2>
-            <button
-              @click="fetchCycles()"
-              class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-            >
-              🔄 Refresh
-            </button>
+            <div class="flex items-center gap-3">
+              <!-- Next Cycle Countdown -->
+              <div class="flex items-center gap-2 px-3 py-2 bg-blue-900/30 border border-blue-700/50 rounded-lg">
+                <span class="text-blue-300 text-sm">⏰ Next:</span>
+                <span class="text-blue-400 font-bold" x-text="formatTime(schedulerCountdown)"></span>
+              </div>
+              <!-- Manual Cycle Button -->
+              <button
+                @click="runManualCycle()"
+                :disabled="manualCycleRunning"
+                :class="manualCycleRunning ? 'bg-gray-600 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700'"
+                class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+              >
+                <span x-show="!manualCycleRunning">▶️ Run Now</span>
+                <span x-show="manualCycleRunning" class="flex items-center gap-2">
+                  <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Running...
+                </span>
+              </button>
+              <!-- Refresh Button -->
+              <button
+                @click="fetchCycles()"
+                class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+              >
+                🔄
+              </button>
+            </div>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
