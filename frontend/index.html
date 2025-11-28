@@ -198,7 +198,7 @@
                       <div class="flex flex-col gap-1">
                         <span class="px-2 py-0.5 bg-orange-600/30 border border-orange-500/50 rounded text-xs font-semibold text-orange-300 w-fit" x-text="cycle.instrument || 'EUR_USD'"></span>
                         <span class="px-2 py-0.5 bg-purple-600/30 border border-purple-500/50 rounded text-xs font-semibold text-purple-300 w-fit" x-text="cycle.strategy || 'Legacy'"></span>
-                        <span 
+                        <span
                           class="px-2 py-0.5 rounded text-xs font-semibold w-fit"
                           :class="cycle.adx >= 30 ? 'bg-blue-600/30 border border-blue-500/50 text-blue-300' : 'bg-amber-600/30 border border-amber-500/50 text-amber-300'"
                           x-text="cycle.adx >= 30 ? 'MACD' : 'Breakout'"
@@ -396,6 +396,7 @@
                 <tr>
                   <th class="px-4 py-3 text-left">Trade ID</th>
                   <th class="px-4 py-3 text-left">Type</th>
+                  <th class="px-4 py-3 text-left">Strategy</th>
                   <th class="px-4 py-3 text-left">Entry Price</th>
                   <th class="px-4 py-3 text-left">Exit Price</th>
                   <th class="px-4 py-3 text-left">Units</th>
@@ -421,6 +422,22 @@
                         x-text="trade.order_type"
                       >
                       </span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div class="flex flex-col gap-1">
+                        <span 
+                          x-show="trade.strategy"
+                          class="px-2 py-0.5 bg-purple-600/30 border border-purple-500/50 rounded text-xs font-semibold text-purple-300 w-fit" 
+                          x-text="trade.strategy"
+                        ></span>
+                        <span 
+                          x-show="trade.adx"
+                          class="px-2 py-0.5 rounded text-xs font-semibold w-fit"
+                          :class="trade.adx >= 30 ? 'bg-blue-600/30 border border-blue-500/50 text-blue-300' : 'bg-amber-600/30 border border-amber-500/50 text-amber-300'"
+                          x-text="trade.adx >= 30 ? 'MACD' : 'Breakout'"
+                        ></span>
+                        <span x-show="!trade.strategy && !trade.adx" class="text-gray-500 text-xs">-</span>
+                      </div>
                     </td>
                     <td
                       class="px-4 py-3 text-green-400 font-semibold"

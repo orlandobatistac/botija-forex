@@ -28,6 +28,9 @@ class Trade(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     closed_at = Column(DateTime(timezone=True), nullable=True)
     notes = Column(Text, nullable=True)
+    # Strategy info
+    strategy = Column(String, nullable=True)  # HybridStrategy, etc.
+    adx = Column(Float, nullable=True)  # ADX value for regime detection
 
 
 class BotStatus(Base):
