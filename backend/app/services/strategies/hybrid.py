@@ -26,7 +26,7 @@ class HybridSignal:
     strategy_used: str = ""  # "breakout" or "macd"
     regime: str = ""  # "consolidation" or "trending"
     adx: Optional[float] = None
-    
+
     # Indicators for display
     macd: Optional[float] = None
     macd_signal: Optional[float] = None

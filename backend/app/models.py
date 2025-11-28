@@ -65,7 +65,7 @@ class TradingCycle(Base):
     ema_fast = Column(Float)   # EMA 20
     ema_slow = Column(Float)   # EMA 50
     ema_trend = Column(Float)  # EMA 200
-    
+
     # Hybrid strategy indicators
     adx = Column(Float, nullable=True)
     macd = Column(Float, nullable=True)
