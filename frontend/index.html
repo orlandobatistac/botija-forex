@@ -964,13 +964,17 @@
             // Refresh positions every 30 seconds
             setInterval(() => this.fetchPositions(), 30000);
 
-            // Refresh hybrid status every 60 seconds
-            setInterval(() => this.fetchHybridStatus(), 60000);
+            // Refresh hybrid status every 5 minutes (aligned with market data updates)
+            setInterval(() => this.fetchHybridStatus(), 300000);
 
-            // Local countdown decrement every second
+            // Local countdown decrement every second + refresh hybrid on cycle completion
             setInterval(() => {
               if (this.schedulerCountdown > 0) {
                 this.schedulerCountdown--;
+                // When countdown hits 0, a cycle just ran - refresh hybrid status
+                if (this.schedulerCountdown === 0) {
+                  setTimeout(() => this.fetchHybridStatus(), 5000); // Wait 5s for cycle to complete
+                }
               }
             }, 1000);
           },
