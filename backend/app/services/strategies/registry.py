@@ -24,6 +24,34 @@ class StrategyInfo:
 
 # Registry of available strategies
 STRATEGIES: Dict[str, StrategyInfo] = {
+    "hybrid": StrategyInfo(
+        id="hybrid",
+        name="Hybrid Breakout+MACD",
+        description="ADX Switch: Breakout (consolidación) + MACD (tendencia). Walk-Forward: 71% consistencia, +1426 pips",
+        class_path="backend.app.services.strategies.hybrid.HybridStrategy",
+        default_params={
+            "adx_switch_threshold": 30,
+            "breakout_range_period": 30,
+            "breakout_extension": 1.5,
+            "macd_fast": 12,
+            "macd_slow": 26,
+            "macd_risk_reward": 2.5
+        }
+    ),
+    "adaptive": StrategyInfo(
+        id="adaptive",
+        name="Adaptive Regime",
+        description="Detecta régimen de mercado (trending/ranging/volatile) y adapta estrategia. Backtest: 100% años rentables EUR_USD",
+        class_path="backend.app.services.strategies.adaptive.AdaptiveStrategy",
+        default_params={
+            "adx_trending_threshold": 25.0,
+            "atr_sl_multiplier": 2.0,
+            "rr_ratio": 2.5,
+            "trade_ranging": False,  # Desactivado por backtest
+            "trade_volatile": False,
+            "trade_quiet": False
+        }
+    ),
     "triple_ema": StrategyInfo(
         id="triple_ema",
         name="Triple EMA",
@@ -93,7 +121,17 @@ def load_strategy(strategy_id: str, params: Optional[Dict[str, Any]] = None):
         final_params.update(params)
 
     try:
-        if strategy_id == "triple_ema":
+        if strategy_id == "hybrid":
+            from .hybrid import HybridStrategy
+            logger.info("Instantiating HybridStrategy")
+            return HybridStrategy(**final_params)
+
+        elif strategy_id == "adaptive":
+            from .adaptive import AdaptiveStrategy
+            logger.info("Instantiating AdaptiveStrategy")
+            return AdaptiveStrategy(**final_params)
+
+        elif strategy_id == "triple_ema":
             from .triple_ema import TripleEMAStrategy
             logger.info("Instantiating TripleEMAStrategy")
             return TripleEMAStrategy(**final_params)
@@ -104,14 +142,14 @@ def load_strategy(strategy_id: str, params: Optional[Dict[str, Any]] = None):
             return RSIEMA200Strategy(**final_params)
 
         else:
-            logger.warning(f"Strategy {strategy_id} not implemented, using RSI+EMA200")
-            from .rsi_ema200 import RSIEMA200Strategy
-            return RSIEMA200Strategy()
+            logger.warning(f"Strategy {strategy_id} not implemented, using hybrid")
+            from .hybrid import HybridStrategy
+            return HybridStrategy()
 
     except Exception as e:
         logger.error(f"Failed to load strategy {strategy_id}: {e}")
-        from .rsi_ema200 import RSIEMA200Strategy
-        return RSIEMA200Strategy()
+        from .hybrid import HybridStrategy
+        return HybridStrategy()
 
 
 def get_default_strategy_id() -> str:

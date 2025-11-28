@@ -63,8 +63,7 @@ def get_trading_bot() -> ForexTradingBot:
             take_profit_pips=Config.TAKE_PROFIT_PIPS,
             trailing_stop_enabled=Config.TRAILING_STOP_ENABLED,
             trailing_stop_distance_pips=Config.TRAILING_STOP_DISTANCE_PIPS,
-            trailing_stop_activation_pips=Config.TRAILING_STOP_ACTIVATION_PIPS,
-            use_triple_ema_strategy=Config.USE_TRIPLE_EMA_STRATEGY
+            trailing_stop_activation_pips=Config.TRAILING_STOP_ACTIVATION_PIPS
         )
 
         # Attach risk manager
@@ -72,7 +71,7 @@ def get_trading_bot() -> ForexTradingBot:
         if rm:
             trading_bot.set_risk_manager(rm)
 
-        logger.info(f"✅ Trading bot initialized: {Config.DEFAULT_INSTRUMENT} ({Config.TRADING_MODE})")
+        logger.info(f"✅ Trading bot initialized: {Config.DEFAULT_INSTRUMENT} ({Config.TRADING_MODE}) - Strategy: {Config.DEFAULT_STRATEGY}")
 
     return trading_bot
 

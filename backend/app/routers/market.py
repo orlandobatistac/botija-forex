@@ -187,6 +187,48 @@ async def get_strategies():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/hybrid-status/{instrument}")
+async def get_hybrid_status(instrument: str, timeframe: str = "H4"):
+    """
+    Get hybrid strategy status for an instrument.
+    Shows current regime (Breakout vs MACD) based on ADX.
+    """
+    try:
+        oanda = get_oanda_client()
+        if not oanda:
+            raise HTTPException(status_code=503, detail="OANDA not configured")
+
+        from ..services.strategies.hybrid import HybridStrategy
+        import pandas as pd
+
+        instrument = instrument.upper().replace("-", "_")
+
+        # Get candles
+        candles = oanda.get_candles(instrument, timeframe, 250)
+        if not candles or len(candles) < 210:
+            raise HTTPException(status_code=400, detail="Insufficient data")
+
+        df = pd.DataFrame(candles)
+
+        strategy = HybridStrategy()
+        status = strategy.get_status(df)
+        signal = strategy.generate_signal(df)
+
+        return {
+            "instrument": instrument,
+            "timeframe": timeframe,
+            "status": status,
+            "signal": signal,
+            "description": f"ADX={status.get('adx', 0):.1f} → {'Breakout' if status.get('regime') == 'consolidation' else 'MACD'}"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting hybrid status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/backtest/{instrument}")
 async def run_backtest(
     instrument: str,

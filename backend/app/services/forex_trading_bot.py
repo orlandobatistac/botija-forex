@@ -41,9 +41,7 @@ class ForexTradingBot:
         take_profit_pips: float = 100,
         trailing_stop_enabled: bool = True,
         trailing_stop_distance_pips: float = 30,
-        trailing_stop_activation_pips: float = 20,
-        use_triple_ema_strategy: bool = False,
-        triple_ema_rr_ratio: float = 2.0
+        trailing_stop_activation_pips: float = 20
     ):
         """Initialize Forex trading bot"""
 
@@ -183,9 +181,9 @@ class ForexTradingBot:
             position_units = self.oanda.get_position_units(self.instrument)
             has_position = position_units != 0
 
-            # Get OHLC data for indicators (need 250 for EMA 200)
+            # Get OHLC data for indicators (need 250 for EMA 200 + hybrid strategy)
             granularity = Config.OANDA_GRANULARITY
-            candle_count = 250 if self.use_triple_ema else 100
+            candle_count = 250
             candles = self.oanda.get_candles(
                 instrument=self.instrument,
                 granularity=granularity,
@@ -303,7 +301,7 @@ class ForexTradingBot:
                 'has_position': has_position,
                 'tech_signals': tech_signals,
                 'ai_signal': ai_signal,
-                'triple_ema_signal': triple_ema_signal.to_dict() if triple_ema_signal else None,
+                'strategy_signal': strategy_signal,  # From registry (hybrid, adaptive, etc.)
                 'mtf_signal': mtf_signal,
                 'mtf_confirmed': mtf_confirmed,
                 'trade_amount_usd': trade_amount,
@@ -519,7 +517,6 @@ class ForexTradingBot:
         from ..database import SessionLocal
 
         start_time = time.time()
-        strategy_name = "Triple EMA" if self.use_triple_ema else "Legacy"
         cycle_data = {
             'instrument': self.instrument,
             'price': 0,
@@ -535,7 +532,7 @@ class ForexTradingBot:
             'trade_id': None,
             'profit_loss': None,
             'trading_mode': Config.TRADING_MODE,
-            'strategy': strategy_name,
+            'strategy': self.strategy_name,
             'error_message': None
         }
 
@@ -560,20 +557,27 @@ class ForexTradingBot:
             cycle_data['ema_slow'] = tech.get('ema50', 0)
             cycle_data['ema_trend'] = tech.get('ema200', 0)
 
-            # Signal: use Triple EMA if enabled, otherwise AI
-            triple_ema_result = analysis.get('triple_ema_signal')
-            if self.use_triple_ema and triple_ema_result:
-                # Map Triple EMA direction to signal format
-                direction = triple_ema_result.get('direction', 'WAIT')
-                if direction == 'LONG':
+            # Signal: use strategy from registry (hybrid, adaptive, etc.)
+            strategy_result = analysis.get('strategy_signal')
+            if strategy_result:
+                # Map strategy direction to signal format
+                signal_val = strategy_result.get('signal', 'NEUTRAL') if isinstance(strategy_result, dict) else getattr(strategy_result, 'direction', 'NEUTRAL')
+                if signal_val in ['buy', 'LONG']:
                     cycle_data['ai_signal'] = 'BUY'
-                elif direction == 'SHORT':
+                elif signal_val in ['sell', 'SHORT']:
                     cycle_data['ai_signal'] = 'SELL'
                 else:
                     cycle_data['ai_signal'] = 'NEUTRAL'
-                cycle_data['ai_confidence'] = triple_ema_result.get('confidence', 0)
-                cycle_data['ai_reason'] = triple_ema_result.get('reason', '')
+
+                # Get confidence and reason
+                if isinstance(strategy_result, dict):
+                    cycle_data['ai_confidence'] = strategy_result.get('confidence', 0.7)
+                    cycle_data['ai_reason'] = strategy_result.get('reason', f"{self.strategy_name}")
+                else:
+                    cycle_data['ai_confidence'] = getattr(strategy_result, 'confidence', 0.7)
+                    cycle_data['ai_reason'] = getattr(strategy_result, 'reason', f"{self.strategy_name}")
             else:
+                # Fallback to AI signal
                 ai_sig = analysis.get('ai_signal', {})
                 cycle_data['ai_signal'] = ai_sig.get('signal', 'HOLD')
                 cycle_data['ai_confidence'] = ai_sig.get('confidence', 0)
@@ -583,7 +587,7 @@ class ForexTradingBot:
             self.logger.info(f"💱 {self.instrument}: {analysis.get('current_price', 0):.5f} (spread: {analysis.get('spread_pips', 0):.1f} pips)")
             self.logger.info(f"💰 Balance: ${analysis.get('balance', 0):,.2f} | Position: {analysis.get('position_units', 0)} units")
             self.logger.info(f"📈 EMA{Config.EMA_FAST_PERIOD}: {tech.get('ema20', 0):.5f} | EMA{Config.EMA_SLOW_PERIOD}: {tech.get('ema50', 0):.5f} | RSI: {tech.get('rsi14', 0):.1f}")
-            self.logger.info(f"🤖 Signal: {cycle_data['ai_signal']} (confidence: {cycle_data['ai_confidence']:.0%}) - Strategy: {strategy_name}")
+            self.logger.info(f"🤖 Signal: {cycle_data['ai_signal']} (confidence: {cycle_data['ai_confidence']:.0%}) - Strategy: {self.strategy_name}")
 
             # Update trailing stop if position exists
             trailing_result = None

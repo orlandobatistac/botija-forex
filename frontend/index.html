@@ -32,13 +32,6 @@
           </div>
           <div class="flex items-center gap-6">
             <button
-              @click="showBacktestModal = true"
-              class="text-gray-400 hover:text-white transition-colors"
-              title="Backtest"
-            >
-              📊
-            </button>
-            <button
               @click="showConfigModal = true; fetchConfig()"
               class="text-gray-400 hover:text-white transition-colors"
               title="Configuration"
@@ -136,7 +129,34 @@
         </div>
 
         <!-- Next Cycle & Manual Control -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+          <!-- Hybrid Strategy Status -->
+          <div
+            class="bg-gradient-to-br from-indigo-900/30 to-gray-900 rounded-xl border border-indigo-700/50 p-6 shadow-lg"
+          >
+            <div class="text-sm font-medium text-indigo-300 mb-3">
+              🔄 Hybrid Strategy
+            </div>
+            <div class="flex items-center gap-2 mb-2">
+              <span
+                class="text-2xl font-bold"
+                :class="hybridStatus.regime === 'consolidation' ? 'text-yellow-400' : 'text-green-400'"
+                x-text="hybridStatus.active_strategy === 'breakout' ? 'BREAKOUT' : 'MACD'"
+              ></span>
+            </div>
+            <div class="text-xs text-indigo-300/70">
+              ADX: <span x-text="hybridStatus.adx || '—'" class="font-bold"></span>
+              <span class="text-gray-500">| Switch: <span x-text="hybridStatus.adx_threshold || 30"></span></span>
+            </div>
+            <div class="mt-2 text-xs">
+              <span
+                class="px-2 py-0.5 rounded"
+                :class="hybridStatus.regime === 'consolidation' ? 'bg-yellow-600/30 text-yellow-300' : 'bg-green-600/30 text-green-300'"
+                x-text="hybridStatus.regime === 'consolidation' ? '📊 Consolidación' : '📈 Tendencia'"
+              ></span>
+            </div>
+          </div>
+
           <!-- Next Cycle Countdown -->
           <div
             class="bg-gradient-to-br from-blue-900/30 to-gray-900 rounded-xl border border-blue-700/50 p-6 shadow-lg"
@@ -708,161 +728,6 @@
         </div>
       </div>
 
-      <!-- Backtest Modal -->
-      <div
-        x-show="showBacktestModal"
-        x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0"
-        x-transition:enter-end="opacity-100"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100"
-        x-transition:leave-end="opacity-0"
-        class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 overflow-y-auto py-4"
-        @click.self="showBacktestModal = false"
-      >
-        <div class="bg-gray-800 rounded-xl border border-gray-600 p-6 w-full max-w-2xl mx-4 shadow-2xl my-auto">
-          <div class="flex justify-between items-center mb-6">
-            <h2 class="text-xl font-bold flex items-center gap-2">
-              <span>📊</span> Backtest
-            </h2>
-            <button @click="showBacktestModal = false" class="text-gray-400 hover:text-white text-2xl">&times;</button>
-          </div>
-
-          <!-- Controls -->
-          <div class="flex flex-wrap gap-4 mb-6 items-end">
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">Strategy</label>
-              <select x-model="backtestStrategy" class="bg-gray-700 rounded px-3 py-2 text-white border border-gray-600">
-                <template x-for="s in strategies" :key="s.id">
-                  <option :value="s.id" x-text="s.name"></option>
-                </template>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">Instrument</label>
-              <div class="bg-gray-700 rounded px-3 py-2 font-mono text-cyan-400" x-text="botStatus.instrument"></div>
-            </div>
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">Timeframe</label>
-              <select x-model="backtestTimeframe" class="bg-gray-700 rounded px-3 py-2 text-white border border-gray-600">
-                <option value="M15">M15</option>
-                <option value="H1">H1</option>
-                <option value="H4">H4</option>
-                <option value="D">Daily</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">Period</label>
-              <select x-model="backtestMonths" class="bg-gray-700 rounded px-3 py-2 text-white border border-gray-600">
-                <option value="1">1 month</option>
-                <option value="3">3 months</option>
-                <option value="6">6 months</option>
-                <option value="12">12 months</option>
-                <option value="24">24 months</option>
-              </select>
-            </div>
-            <button
-              @click="runBacktest()"
-              :disabled="backtestRunning"
-              class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded font-semibold transition-colors"
-            >
-              <span x-show="!backtestRunning">▶️ Run</span>
-              <span x-show="backtestRunning">⏳ Running...</span>
-            </button>
-          </div>
-
-          <!-- Results -->
-          <div x-show="backtestResult" class="space-y-4">
-            <!-- Strategy & Summary -->
-            <div class="bg-gray-700/50 rounded-lg p-4">
-              <div class="flex justify-between items-center mb-3">
-                <div>
-                  <span class="text-sm text-gray-400">Strategy: </span>
-                  <span class="font-semibold text-purple-400" x-text="backtestResult?.strategy"></span>
-                </div>
-                <div class="text-xs text-gray-400">
-                  <span x-text="backtestResult?.start_date?.split('T')[0]"></span>
-                  <span class="mx-1">→</span>
-                  <span x-text="backtestResult?.end_date?.split('T')[0]"></span>
-                </div>
-              </div>
-              <div class="grid grid-cols-3 md:grid-cols-6 gap-3 text-center">
-                <div>
-                  <div class="text-xs text-gray-400">Trades</div>
-                  <div class="font-bold text-lg" x-text="backtestResult?.total_trades"></div>
-                </div>
-                <div>
-                  <div class="text-xs text-gray-400">Win Rate</div>
-                  <div class="font-bold text-lg" :class="backtestResult?.win_rate >= 50 ? 'text-green-400' : 'text-red-400'"
-                       x-text="backtestResult?.win_rate?.toFixed(1) + '%'"></div>
-                </div>
-                <div>
-                  <div class="text-xs text-gray-400">Gross Pips</div>
-                  <div class="font-bold text-lg text-gray-300" x-text="(backtestResult?.gross_pips || 0).toFixed(1)"></div>
-                </div>
-                <div>
-                  <div class="text-xs text-gray-400">Net Pips</div>
-                  <div class="font-bold text-lg" :class="backtestResult?.total_pips >= 0 ? 'text-green-400' : 'text-red-400'"
-                       x-text="backtestResult?.total_pips?.toFixed(1)"></div>
-                  <div class="text-xs text-gray-500" x-text="'(-' + (backtestResult?.spread_cost_pips || 0).toFixed(1) + ' spread)'"></div>
-                </div>
-                <div>
-                  <div class="text-xs text-gray-400">Profit Factor</div>
-                  <div class="font-bold text-lg" :class="backtestResult?.profit_factor >= 1 ? 'text-green-400' : 'text-red-400'"
-                       x-text="backtestResult?.profit_factor?.toFixed(2)"></div>
-                </div>
-                <div>
-                  <div class="text-xs text-gray-400">Max Drawdown</div>
-                  <div class="font-bold text-lg text-red-400" x-text="(backtestResult?.max_drawdown_pips || 0).toFixed(1) + ' pips'"></div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Trades Table -->
-            <div x-show="backtestResult?.trades?.length > 0" class="overflow-x-auto max-h-64 overflow-y-auto">
-              <table class="w-full text-sm">
-                <thead class="bg-gray-700 sticky top-0">
-                  <tr>
-                    <th class="px-3 py-2 text-left">#</th>
-                    <th class="px-3 py-2 text-left">Type</th>
-                    <th class="px-3 py-2 text-right">Entry</th>
-                    <th class="px-3 py-2 text-right">Exit</th>
-                    <th class="px-3 py-2 text-right">Pips</th>
-                    <th class="px-3 py-2 text-left">Exit Reason</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <template x-for="(trade, i) in backtestResult?.trades || []" :key="i">
-                    <tr class="border-t border-gray-700 hover:bg-gray-700/50">
-                      <td class="px-3 py-2 text-gray-400" x-text="i + 1"></td>
-                      <td class="px-3 py-2">
-                        <span :class="trade.direction === 'LONG' ? 'text-green-400' : 'text-red-400'" x-text="trade.direction"></span>
-                      </td>
-                      <td class="px-3 py-2 text-right font-mono" x-text="trade.entry_price?.toFixed(5)"></td>
-                      <td class="px-3 py-2 text-right font-mono" x-text="trade.exit_price?.toFixed(5)"></td>
-                      <td class="px-3 py-2 text-right font-semibold"
-                          :class="trade.pnl_pips >= 0 ? 'text-green-400' : 'text-red-400'"
-                          x-text="trade.pnl_pips?.toFixed(1)"></td>
-                      <td class="px-3 py-2 text-gray-400 text-xs" x-text="trade.exit_reason"></td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-            </div>
-
-            <!-- No trades message -->
-            <div x-show="backtestResult?.total_trades === 0" class="text-center py-8 text-gray-400">
-              No trades generated for this period.
-            </div>
-          </div>
-
-          <!-- Initial state -->
-          <div x-show="!backtestResult && !backtestRunning" class="text-center py-8 text-gray-400">
-            Configure parameters and click Run to start backtest.
-          </div>
-        </div>
-      </div>
-
       <!-- Footer -->
       <footer class="border-t border-gray-700 bg-gray-950 mt-8">
         <div
@@ -882,16 +747,9 @@
           schedulerCountdown: 0,
           lastServerSync: Date.now(),
           showConfigModal: false,
-          showBacktestModal: false,
           config: null,
           // Strategies
           strategies: [],
-          // Backtest state
-          backtestRunning: false,
-          backtestStrategy: '',  // Se inicializa en fetchStrategies()
-          backtestTimeframe: 'H4',
-          backtestMonths: 6,
-          backtestResult: null,
           botStatus: {
             is_running: false,
             balance: 0,
@@ -918,6 +776,12 @@
           lastUpdate: new Date().toISOString(),
           positions: [],
           totalUnrealizedPL: 0,
+          hybridStatus: {
+            adx: 0,
+            adx_threshold: 30,
+            regime: 'unknown',
+            active_strategy: 'hybrid'
+          },
 
           // Computed: time since last cycle
           get timeSinceLastCycle() {
@@ -1080,37 +944,6 @@
                 { id: 'triple_ema', name: 'Triple EMA' },
                 { id: 'rsi_ema200', name: 'RSI + EMA200' }
               ];
-              this.backtestStrategy = 'triple_ema';
-            }
-          },
-
-          async runBacktest() {
-            this.backtestRunning = true;
-            this.backtestResult = null;
-            try {
-              // Calculate candles based on months and timeframe
-              const candlesPerDay = {
-                'M15': 96,   // 24h * 4 per hour
-                'H1': 24,    // 24 per day
-                'H4': 6,     // 6 per day
-                'D': 1       // 1 per day
-              };
-              const daysPerMonth = 30;
-              let candles = this.backtestMonths * daysPerMonth * (candlesPerDay[this.backtestTimeframe] || 6);
-
-              // Ensure minimum 300 candles (EMA 200 + buffer)
-              candles = Math.max(candles, 300);
-              // Cap at OANDA limit
-              candles = Math.min(candles, 5000);
-
-              const response = await fetch(`/api/v1/market/backtest/${this.botStatus.instrument}?timeframe=${this.backtestTimeframe}&candles=${candles}&strategy=${this.backtestStrategy}`);
-              if (!response.ok) throw new Error('Backtest failed');
-              this.backtestResult = await response.json();
-            } catch (error) {
-              console.error('Backtest error:', error);
-              this.showToast('Error running backtest', 'error');
-            } finally {
-              this.backtestRunning = false;
             }
           },
 
@@ -1120,6 +953,7 @@
             await this.fetchLogs();
             await this.fetchCycles();
             await this.fetchPositions();
+            await this.fetchHybridStatus();
 
             // Refresh status every 10 seconds
             setInterval(() => this.refreshStatus(), 10000);
@@ -1130,12 +964,32 @@
             // Refresh positions every 30 seconds
             setInterval(() => this.fetchPositions(), 30000);
 
+            // Refresh hybrid status every 60 seconds
+            setInterval(() => this.fetchHybridStatus(), 60000);
+
             // Local countdown decrement every second
             setInterval(() => {
               if (this.schedulerCountdown > 0) {
                 this.schedulerCountdown--;
               }
             }, 1000);
+          },
+
+          async fetchHybridStatus() {
+            try {
+              const resp = await fetch("/api/v1/market/hybrid-status/EUR_USD?timeframe=H4");
+              if (resp.ok) {
+                const data = await resp.json();
+                this.hybridStatus = data.status || {
+                  adx: 0,
+                  adx_threshold: 30,
+                  regime: 'unknown',
+                  active_strategy: 'hybrid'
+                };
+              }
+            } catch (e) {
+              console.warn("Error fetching hybrid status:", e);
+            }
           },
 
           async refreshStatus() {
