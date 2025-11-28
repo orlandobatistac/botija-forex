@@ -699,7 +699,6 @@
           loading: true,
           status: null,
           schedulerCountdown: 0,
-          lastServerSync: Date.now(),
           showConfigModal: false,
           config: null,
           // Strategies
@@ -894,8 +893,8 @@
             await this.fetchPositions();
             await this.fetchHybridStatus();
 
-            // Refresh status every 10 seconds
-            setInterval(() => this.refreshStatus(), 10000);
+            // Refresh status every 5 seconds (includes countdown)
+            setInterval(() => this.refreshStatus(), 5000);
 
             // Refresh cycles every 10 seconds
             setInterval(() => this.fetchCycles(), 10000);
@@ -903,19 +902,8 @@
             // Refresh positions every 30 seconds
             setInterval(() => this.fetchPositions(), 30000);
 
-            // Refresh hybrid status every 5 minutes (aligned with market data updates)
+            // Refresh hybrid status every 5 minutes
             setInterval(() => this.fetchHybridStatus(), 300000);
-
-            // Local countdown decrement every second + refresh hybrid on cycle completion
-            setInterval(() => {
-              if (this.schedulerCountdown > 0) {
-                this.schedulerCountdown--;
-                // When countdown hits 0, a cycle just ran - refresh hybrid status
-                if (this.schedulerCountdown === 0) {
-                  setTimeout(() => this.fetchHybridStatus(), 5000); // Wait 5s for cycle to complete
-                }
-              }
-            }, 1000);
           },
 
           async fetchHybridStatus() {
@@ -943,16 +931,9 @@
                 const schedData = await schedulerResp.json();
                 this.schedulerStatus = schedData;
 
-                // Sync countdown from server
+                // Use server countdown directly
                 if (schedData.seconds_until_next != null) {
-                  const serverSeconds = Math.max(0, Math.floor(schedData.seconds_until_next));
-                  const diff = Math.abs(this.schedulerCountdown - serverSeconds);
-
-                  // Only sync if drift > 5 seconds
-                  if (diff > 5 || this.schedulerCountdown === 0) {
-                    this.schedulerCountdown = serverSeconds;
-                  }
-                  this.lastServerSync = Date.now();
+                  this.schedulerCountdown = Math.max(0, Math.floor(schedData.seconds_until_next));
                 }
               }
 
